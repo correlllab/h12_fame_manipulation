@@ -1,0 +1,84 @@
+# Sim orchestrator config: H1-2 with Magpie gripper + eflesh sensors.
+
+mujoco:
+  xml_path: "../../h12_adaptive_policy/h1_2/h1_2_magpie_eflesh_fame.xml"
+  simulation_dt: 0.002
+  headless: false
+  duration: 0.0
+  warmup_seconds: 2.0
+
+robot:
+  num_h12_motors: 27
+  num_leg_motors: 12
+  default_q:
+    [-0.16, 0.0, 0.0,  0.36, -0.2, 0.0,
+     -0.16, 0.0, 0.0,  0.36, -0.2, 0.0,
+      0.0,
+     -0.9,  0.0, 0.0,  0.5,  0.0,  0.0, 0.0,
+     -0.9,  0.0, 0.0,  0.5,  0.0,  0.0, 0.0]
+  default_kp:
+    [200, 200, 200, 300,  60,  40,
+     200, 200, 200, 300,  60,  40,
+     200,
+     500, 500, 500, 500, 500, 500, 500,
+     500, 500, 500, 500, 500, 500, 500]
+  default_kd:
+    [5.0, 5.0, 5.0, 7.5, 1.0, 0.3,
+     5.0, 5.0, 5.0, 7.5, 1.0, 0.3,
+     10.0,
+     5.0, 5.0, 5.0, 7.5, 1.0, 0.3, 0.0,
+     5.0, 5.0, 5.0, 7.5, 1.0, 0.3, 0.0]
+
+topics:
+  low_state: "rt/lowstate"
+  low_cmd_out: "rt/lowcmd"
+  low_cmd_lower_in: "rt/safety/lowcmd_lower_in"
+  low_cmd_upper_in: "rt/safety/lowcmd_upper_in"
+network:
+  domain_id: 0
+  interface: ""
+
+fame:
+  policy_path: "../../h12_adaptive_policy/data/rma_hand/policy.pt"
+  encoder_path: "../../h12_adaptive_policy/data/rma_hand/encoder_3999.pt"
+  policy_num_joints: 27
+  obs_history_len: 3
+  num_obs: 252
+  single_obs_dim: 76
+  num_actions: 12
+  ang_vel_scale: 0.25
+  dof_pos_scale: 1.0
+  dof_vel_scale: 0.05
+  action_scale: 0.25
+  cmd_scale: [2.0, 2.0, 0.25]
+  cmd_init: [0.0, 0.0, 0.0]
+  height_cmd: 0.75
+  control_decimation: 10
+  publish_hz: 500.0
+  default_angles_legs:
+    [-0.16, 0.0, 0.0, 0.36, -0.2, 0.0,
+     -0.16, 0.0, 0.0, 0.36, -0.2, 0.0]
+  default_angles_arms:
+    [0.0,
+     -0.9, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0,
+     -0.9, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0]
+  legs_kp:
+    [200, 200, 200, 300, 60, 40,
+     200, 200, 200, 300, 60, 40]
+  legs_kd:
+    [5.0, 5.0, 5.0, 7.5, 1.0, 0.3,
+     5.0, 5.0, 5.0, 7.5, 1.0, 0.3]
+  left_hand_force: [0.0, 0.0, 0.0]
+  right_hand_force: [0.0, 0.0, 0.0]
+  no_encode: false
+
+ik:
+  controller_config: "sim_split_controller.yaml"
+  urdf_path:           "../../h12_ros2_controller/assets/h1_2/h1_2_handless.urdf"
+  urdf_sphere_path:    "../../h12_ros2_controller/assets/h1_2/h1_2_handless_sphere.urdf"
+  srdf_sphere_path:    "../../h12_ros2_controller/assets/h1_2/h1_2_handless_sphere_collision.srdf"
+  handless: true
+  visualize: false
+  goals:
+    - name: "home"
+      seconds: 20.0

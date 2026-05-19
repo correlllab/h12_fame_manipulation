@@ -1,0 +1,42 @@
+# h12_safety_layer config for SIM ONLY. Relaxes estop limits so transient leg
+# sag during FAME warmup and arm-controller settling does not trip the relay.
+# Do NOT use this config on the real robot.
+
+mode: split_mode
+
+topics:
+  low_cmd_lower_in: rt/safety/lowcmd_lower_in
+  low_cmd_upper_in: rt/safety/lowcmd_upper_in
+  low_cmd_out: rt/lowcmd
+  low_state: rt/lowstate
+
+network:
+  domain_id: 0
+  interface: ''
+
+control:
+  publish_hz: 500.0
+
+limits:
+  # Wide clip so policy + IK can write any reasonable target without truncation
+  # during a sim test. Tighten these for real-robot deployment.
+  clip:
+    position_offset: 0.1
+    velocity_ratio: 5.0
+    torque_ratio: 1.0
+    kp_max: 2000.0
+    kd_max: 100.0
+  # Estop effectively disabled in sim. position_offset is NEGATIVE so the
+  # estop window EXPANDS beyond URDF range (see _derive_q_limits in
+  # h12_safety_layer/core/config.py: low = URDF_low + offset, high = URDF_high
+  # - offset). Velocity/torque ratios are also far above the URDF rated values
+  # so they never trigger during normal sim stepping.
+  estop:
+    position_offset: -3.0
+    velocity_ratio: 50.0
+    torque_ratio: 50.0
+
+logging:
+  enabled: false
+  base_dir: /tmp/h12_safety_layer_sim
+  chunk_prefix: chunk_
