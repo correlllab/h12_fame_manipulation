@@ -5,8 +5,7 @@ Thin orchestration layer that runs **FAME** (the RMA locomotion policy from
 **FrameController** upper-body IK from
 [h12_ros2_controller](../h12_ros2_controller) on top of a Mujoco simulation,
 relaying both through the
-[h12_safety_layer](../h12_safety_layer) in **split mode** — the same topology
-your coworker described for the live robot.
+[h12_safety_layer](../h12_safety_layer) in **split mode**.
 
 Because the integration touches three repos that should not depend on each
 other, the runner lives in its own folder. It only imports the three packages
@@ -34,8 +33,7 @@ other, the runner lives in its own folder. It only imports the three packages
 
 The safety_layer’s split-mode merge takes motor_cmd[0:12] from FAME and
 motor_cmd[12:27] from the FrameController — exactly the contract documented in
-[`h12_safety_layer/docs/architecture.md`](../h12_safety_layer/docs/architecture.md)
-and in your coworker's note.
+[`h12_safety_layer/docs/architecture.md`](../h12_safety_layer/docs/architecture.md).
 
 ---
 
