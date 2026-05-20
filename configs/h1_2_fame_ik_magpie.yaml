@@ -56,7 +56,7 @@ fame:
   action_scale: 0.25
   cmd_scale: [2.0, 2.0, 0.25]
   cmd_init: [0.0, 0.0, 0.0]
-  height_cmd: 0.75
+  height_cmd: 1.0
   control_decimation: 10
   publish_hz: 500.0
   default_angles_legs:

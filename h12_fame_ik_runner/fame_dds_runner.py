@@ -90,7 +90,7 @@ class FameDDSRunner:
         self._action_scale = float(fame.get("action_scale", 0.25))
         self._cmd_scale = np.asarray(fame.get("cmd_scale", [2.0, 2.0, 0.25]), dtype=np.float32)
         self._cmd = np.asarray(fame.get("cmd_init", [0.0, 0.0, 0.0]), dtype=np.float32)
-        self._height_cmd = float(fame.get("height_cmd", 0.75))
+        self._height_cmd = float(fame.get("height_cmd", 1.0))
         self._control_decimation = int(fame.get("control_decimation", 10))
         self._publish_hz = float(fame.get("publish_hz", 500.0))
         self._no_encode = bool(fame.get("no_encode", False))
