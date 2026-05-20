@@ -8,9 +8,12 @@ mujoco:
   headless: false
   # Wall-clock duration cap. <=0 means run until interrupted.
   duration: 0.0
-  # Hold the robot in the air for this many seconds at startup so processes can
-  # warm up before gravity hits.
-  warmup_seconds: 2.0
+  # Freeze the sim (publish lowstate but skip mj_step) for up to this many
+  # seconds at startup so FAME has time to load torch + the encoder/policy and
+  # start publishing real leg targets before gravity acts. The bridge exits
+  # warmup early the moment it sees the first mode==1 leg cmd, so a generous
+  # ceiling here is fine.
+  warmup_seconds: 6.0
 
 # H1-2 has 27 motors driven by the first 27 actuators of scene.xml; extra
 # actuators after these (e.g. Magpie gripper) are held passively by the bridge.
@@ -23,8 +26,8 @@ robot:
     [-0.16, 0.0, 0.0,  0.36, -0.2, 0.0,
      -0.16, 0.0, 0.0,  0.36, -0.2, 0.0,
       0.0,
-     -0.9,  0.0, 0.0,  0.5,  0.0,  0.0, 0.0,
-     -0.9,  0.0, 0.0,  0.5,  0.0,  0.0, 0.0]
+     -0.0,  0.0, 0.0,  0.0,  0.0,  0.0, 0.0,
+     -0.0,  0.0, 0.0,  0.0,  0.0,  0.0, 0.0]
   default_kp:
     [200, 200, 200, 300,  60,  40,
      200, 200, 200, 300,  60,  40,
@@ -73,8 +76,8 @@ fame:
   # Used as part of the e_t observation; mirrors mujoco_deploy_h12_rma.py.
   default_angles_arms:
     [0.0,
-     -0.9, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0,
-     -0.9, 0.0, 0.0, 0.5, 0.0, 0.0, 0.0]
+     -0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+     -0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
   legs_kp:
     [200, 200, 200, 300, 60, 40,
      200, 200, 200, 300, 60, 40]
@@ -84,7 +87,7 @@ fame:
   left_hand_force: [0.0, 0.0, 0.0]
   right_hand_force: [0.0, 0.0, 0.0]
   # When true, the encoder receives zeros (sanity-check naive policy).
-  no_encode: false
+  no_encode: true
 
 # IK driver (h12_ros2_controller FrameController) settings.
 ik:

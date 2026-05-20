@@ -67,6 +67,11 @@ class MujocoDDSBridge:
         self._sim_dt = float(mj_cfg.get("simulation_dt", 0.002))
         self._headless = headless if headless is not None else bool(mj_cfg.get("headless", False))
         self._duration = float(duration if duration is not None else mj_cfg.get("duration", 0.0))
+        # Publish lowstate but freeze physics for this long at startup, so FAME
+        # (which takes ~2-4 s to import torch + load the encoder/policy in a
+        # sibling process) has time to come online and start publishing real
+        # leg targets before gravity is allowed to act.
+        self._warmup_seconds = float(mj_cfg.get("warmup_seconds", 0.0))
 
         robot_cfg = self._cfg.get("robot", {})
         self._num_h12 = int(robot_cfg.get("num_h12_motors", NUM_H12_MOTORS))
@@ -115,10 +120,15 @@ class MujocoDDSBridge:
         # FAME, but we still try to find the named site for body-frame data).
         self._imu_site_id = mujoco.mj_name2id(self._m, mujoco.mjtObj.mjOBJ_SITE, "imu")
 
-        # Initialize robot at default joint pose so it does not collapse before
-        # the first FAME/IK command lands.
-        for i, adr in enumerate(self._h12_qpos_adr):
-            self._d.qpos[adr] = float(self._default_q[i])
+        # Leave qpos at the model's qpos0 (the XML's `pos`/joint defaults).
+        # For the H1-2 scenes this is "straight legs on the ground" — a stable
+        # equilibrium that holds while the bridge waits for FAME to come up.
+        # We used to override joints to default_q here, but default_q is the
+        # bent operating stance and the XML pelvis is at z=1.03 (sized for
+        # straight legs), so overriding produced an off-ground init that dropped
+        # the robot onto bent feet on first mj_step — an impulse the default PD
+        # could not absorb. mj_resetData (Backspace in the viewer) hit the same
+        # stable qpos0 state, which is why pressing reset "fixed" the fall.
 
         # Latched command state. Pre-populate with warmup PD so the bridge can
         # apply torques immediately, without waiting for the first DDS message.
@@ -156,6 +166,9 @@ class MujocoDDSBridge:
         self._tick = 0
         self._cmd_msg_count = 0
         self._first_cmd_time = 0.0
+        # Set when _on_low_cmd first sees a mode==1 motor_cmd for a leg motor;
+        # used as the "FAME is alive" signal that ends the warmup window early.
+        self._first_drive_leg_time = 0.0
 
     # ----------------------------------------------------------- DDS callbacks
 
@@ -178,6 +191,8 @@ class MujocoDDSBridge:
                 self._latched_tau[i] = float(mc.tau)
                 self._latched_kp[i] = float(mc.kp)
                 self._latched_kd[i] = float(mc.kd)
+                if i < 12 and self._first_drive_leg_time == 0.0:
+                    self._first_drive_leg_time = now
 
     # ----------------------------------------------------------- State publish
 
@@ -287,7 +302,40 @@ class MujocoDDSBridge:
     def _should_stop(self, start: float) -> bool:
         return self._duration > 0.0 and (time.time() - start) >= self._duration
 
+    def _warmup_done(self, start: float) -> bool:
+        if self._warmup_seconds <= 0.0:
+            return True
+        if (time.time() - start) >= self._warmup_seconds:
+            return True
+        with self._cmd_lock:
+            return self._first_drive_leg_time > 0.0
+
+    def _warmup_tick(self) -> None:
+        """Publish state at sim rate but do NOT step physics.
+
+        Keeps the robot frozen at its init pose (joints = default_q, base from
+        XML) while FAME loads torch and starts publishing. Once a real leg cmd
+        lands the latched targets are already live, and the main loop can step
+        without the policy fighting an already-falling robot.
+        """
+        self._step_counter += 1
+        if self._step_counter % self._state_pub_decim == 0:
+            self._fill_and_publish_low_state()
+
     def _run_headless(self, start: float) -> None:
+        if self._warmup_seconds > 0.0:
+            print(f"[bridge] warmup: holding sim frozen up to {self._warmup_seconds:.2f}s "
+                  "or until first FAME leg cmd lands", flush=True)
+            while not self._warmup_done(start):
+                tick_start = time.time()
+                self._warmup_tick()
+                sleep_for = self._sim_dt - (time.time() - tick_start)
+                if sleep_for > 0:
+                    time.sleep(sleep_for)
+            with self._cmd_lock:
+                dt_drive = self._first_drive_leg_time - start if self._first_drive_leg_time else -1.0
+            print(f"[bridge] warmup done (first leg cmd at t+{dt_drive:.2f}s); stepping physics now",
+                  flush=True)
         # Step in real time so that DDS rates remain reasonable. A tighter sim
         # rate is possible but matching wall-clock keeps FAME's policy stable.
         while not self._should_stop(start):
@@ -300,6 +348,20 @@ class MujocoDDSBridge:
     def _run_with_viewer(self, start: float) -> None:
         import mujoco.viewer  # imported lazily so headless works without a display
         with mujoco.viewer.launch_passive(self._m, self._d) as viewer:
+            if self._warmup_seconds > 0.0:
+                print(f"[bridge] warmup: holding sim frozen up to {self._warmup_seconds:.2f}s "
+                      "or until first FAME leg cmd lands", flush=True)
+                while viewer.is_running() and not self._warmup_done(start):
+                    tick_start = time.time()
+                    self._warmup_tick()
+                    viewer.sync()
+                    sleep_for = self._sim_dt - (time.time() - tick_start)
+                    if sleep_for > 0:
+                        time.sleep(sleep_for)
+                with self._cmd_lock:
+                    dt_drive = self._first_drive_leg_time - start if self._first_drive_leg_time else -1.0
+                print(f"[bridge] warmup done (first leg cmd at t+{dt_drive:.2f}s); stepping physics now",
+                      flush=True)
             while viewer.is_running() and not self._should_stop(start):
                 step_start = time.time()
                 self._step_once()
