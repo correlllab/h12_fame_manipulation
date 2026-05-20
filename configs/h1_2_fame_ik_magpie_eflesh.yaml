@@ -39,8 +39,8 @@ network:
   interface: ""
 
 fame:
-  policy_path: "../../h12_adaptive_policy/data/rma_hand/policy.pt"
-  encoder_path: "../../h12_adaptive_policy/data/rma_hand/encoder_3999.pt"
+  policy_path: "../h12_fame_ik_runner/ckpts/magpie/policy_new.pt"
+  encoder_path: "../h12_fame_ik_runner/ckpts/magpie/encoder_3800.pt"
   policy_num_joints: 27
   obs_history_len: 3
   num_obs: 252

@@ -2,7 +2,7 @@
 # Paths are resolved relative to this YAML's parent directory unless absolute.
 
 mujoco:
-  xml_path: "../../h12_adaptive_policy/h1_2/scene.xml"
+  xml_path: "../scenes/h1_2_table.xml"
   simulation_dt: 0.002
   # If true, no viewer is spawned; sim just steps.
   headless: false
@@ -54,8 +54,8 @@ network:
 # FAME (h12_adaptive_policy) settings.
 fame:
   # Reuse the existing arm-mode RMA config; we override topic/xml/etc here.
-  policy_path: "../../h12_adaptive_policy/data/rma_hand/policy.pt"
-  encoder_path: "../../h12_adaptive_policy/data/rma_hand/encoder_3999.pt"
+  policy_path: "../h12_fame_ik_runner/ckpts/handless/policy.pt"
+  encoder_path: "../h12_fame_ik_runner/ckpts/handless/encoder_3999.pt"
   policy_num_joints: 27
   obs_history_len: 3
   num_obs: 252
@@ -67,7 +67,7 @@ fame:
   action_scale: 0.25
   cmd_scale: [2.0, 2.0, 0.25]
   cmd_init: [0.0, 0.0, 0.0]
-  height_cmd: 1.0
+  height_cmd: 0.80
   control_decimation: 10  # 500Hz / 10 = 50 Hz policy rate
   publish_hz: 500.0
   default_angles_legs:

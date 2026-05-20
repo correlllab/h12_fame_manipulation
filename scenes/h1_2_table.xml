@@ -1,0 +1,56 @@
+<mujoco model="h1_2 + workbench table">
+  <!-- Robot body. Resolved from this file's directory:
+       scenes/  ->  ../../h12_adaptive_policy/h1_2/h1_2_handless.xml -->
+  <include file="../../h12_adaptive_policy/h1_2/h1_2_handless.xml"/>
+
+  <statistic center="0.7 0 0.9" extent="1.4"/>
+
+  <visual>
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.1 0.1 0.1" specular="0.9 0.9 0.9"/>
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <global azimuth="-140" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <texture type="skybox" builtin="flat" rgb1="0 0 0" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge"
+             rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3" markrgb="0.8 0.8 0.8"
+             width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true"
+              texrepeat="5 5" reflectance="0.2"/>
+    <material name="table_top" rgba="0.55 0.42 0.28 1.0" reflectance="0.05"/>
+    <material name="table_leg" rgba="0.30 0.22 0.15 1.0" reflectance="0.05"/>
+  </asset>
+
+  <worldbody>
+    <light pos="1 0 3.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+
+    <!-- Workbench: 71 3/4" x 29 1/2" x 29 1/8" (1.82245 x 0.7493 x 0.73978 m).
+         Length aligned along y (wide across robot's front).
+         Near edge at x = 0.55 m: clears the arms-at-default pose (left wrist
+         sits at ~x=0.47 with shoulder pitched -0.9 / elbow 0.5). With near-edge
+         at 0.35 m the front legs caught the wrists and the robot drifted.
+         Top surface at z = 0.73978 m.
+         Built as 4 legs + a slab top so the robot can reach UNDER the table
+         (a single solid box would block the chest cavity at floor level). -->
+    <body name="table" pos="0.92465 0 0">
+      <!-- top slab: 0.7493 (x) * 1.82245 (y) * 0.04 (z), centered at z=0.71978 (so top face at z=0.73978) -->
+      <geom name="table_top" type="box"
+            size="0.37465 0.911225 0.02"
+            pos="0 0 0.71978"
+            material="table_top"
+            friction="1.0 0.005 0.0001"/>
+      <!-- four legs: 0.06 x 0.06 cross-section, from floor up to underside of top slab (z=0.69978).
+           Leg half-height = 0.34989; placed at the four inner corners (1 cm inset from top edges). -->
+      <geom name="table_leg_lf" type="box" size="0.03 0.03 0.34989"
+            pos=" 0.34465  0.881225 0.34989" material="table_leg"/>
+      <geom name="table_leg_rf" type="box" size="0.03 0.03 0.34989"
+            pos=" 0.34465 -0.881225 0.34989" material="table_leg"/>
+      <geom name="table_leg_lb" type="box" size="0.03 0.03 0.34989"
+            pos="-0.34465  0.881225 0.34989" material="table_leg"/>
+      <geom name="table_leg_rb" type="box" size="0.03 0.03 0.34989"
+            pos="-0.34465 -0.881225 0.34989" material="table_leg"/>
+    </body>
+  </worldbody>
+</mujoco>
