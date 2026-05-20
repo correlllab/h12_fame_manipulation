@@ -42,7 +42,9 @@ network:
 
 fame:
   policy_path: "../../h12_adaptive_policy/data/rma_hand/policy.pt"
+  # policy_path: "/home/humanoid/ws_ctrl/src/h12_fame_ik_runner/h12_fame_ik_runner/new_ckpts/encoder_3800.pt"
   encoder_path: "../../h12_adaptive_policy/data/rma_hand/encoder_3999.pt"
+  # encoder_path: "/home/humanoid/ws_ctrl/src/h12_fame_ik_runner/h12_fame_ik_runner/new_ckpts/policy.pt"
   policy_num_joints: 27
   obs_history_len: 3
   num_obs: 252

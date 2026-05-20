@@ -7,6 +7,26 @@ Thin orchestration layer that runs **FAME** (the RMA locomotion policy from
 relaying both through the
 [h12_safety_layer](../h12_safety_layer) in **split mode**.
 
+Two equivalent setups ship in this folder:
+
+* **Orchestrator setup** (`scripts/viewer.sh`, `scripts/headless_smoke.sh`) —
+  four processes wired together by `orchestrator.py`: safety_layer, the
+  passive `mujoco_dds_bridge`, the `fame_dds_runner`, and the IK driver. Good
+  for unattended smoke tests because everything runs in one terminal and Ctrl-C
+  tears it all down.
+* **Simple setup** (`scripts/simple_run.sh`) — two processes you keep
+  running, plus whatever upper-body publisher you want in a third terminal.
+  Mujoco lives inside the FAME process (so the policy talks to the sim
+  in-process, not through DDS), and the safety_layer + an arm publisher
+  (`arm_joint_stream`, `ik_dds_repl`, or `arm_controller_goto`) exercise the
+  split-mode merge. **Use this when you want to send high-rate joint commands
+  to the arm** — the `frame_task` REPL is goal-and-converge, whereas
+  `arm_joint_stream` streams whatever `q_des` you have at 500 Hz.
+
+Both setups exercise the same DDS topology (`rt/safety/lowcmd_lower_in` for
+legs, `rt/safety/lowcmd_upper_in` for arms, `rt/lowcmd` for the merged output,
+`rt/lowstate` for state).
+
 Because the integration touches three repos that should not depend on each
 other, the runner lives in its own folder. It only imports the three packages
 (plus `unitree_sdk2py`) and adds:
@@ -17,6 +37,8 @@ other, the runner lives in its own folder. It only imports the three packages
 | [`h12_fame_ik_runner/fame_dds_runner.py`](h12_fame_ik_runner/fame_dds_runner.py) | FAME RMA policy. Subscribes `rt/lowstate`, runs encoder+policy at 50 Hz, publishes a 27-motor LowCmd with `mode=1` only for legs (0..11) to `rt/safety/lowcmd_lower_in`. |
 | [`h12_fame_ik_runner/ik_dds_driver.py`](h12_fame_ik_runner/ik_dds_driver.py) | FrameController driver. Two modes: `--mode batch` (default — steps through YAML `ik.goals`, used by the orchestrator) and `--mode interactive` (a stdin REPL like `frame_task_client`: send named configs or 6-DOF frame targets). Publishes to `rt/safety/lowcmd_upper_in`. |
 | [`h12_fame_ik_runner/orchestrator.py`](h12_fame_ik_runner/orchestrator.py) | Spawns the four processes (safety, bridge, FAME, IK) in dedicated process groups; tears them down cleanly on Ctrl-C. |
+| [`h12_fame_ik_runner/fame_mujoco_dds.py`](h12_fame_ik_runner/fame_mujoco_dds.py) | Simple setup — FAME + Mujoco + DDS in one process. Steps the sim, runs the RMA policy on the legs locally, publishes `rt/lowstate` + `rt/safety/lowcmd_lower_in`, and subscribes `rt/lowcmd` for the arm targets. Replaces the `bridge` + `fame_dds_runner` pair. |
+| [`h12_fame_ik_runner/arm_joint_stream.py`](h12_fame_ik_runner/arm_joint_stream.py) | High-bandwidth joint-command streamer. Publishes a 27-motor LowCmd to `rt/safety/lowcmd_upper_in` at 500 Hz with `mode=1` on motors 12..26 (torso + arms). REPL commands mutate the streamed `q_des`; the publisher thread sends the latest value every tick — no IK, no goal convergence. |
 
 ```
 ┌──────────┐  rt/safety/lowcmd_lower_in ─┐
@@ -150,6 +172,151 @@ Tips while the viewer is up:
 * The viewer respects mouse drag / scroll to orbit and zoom. Press `Esc` (or
   close the window) to stop just the bridge — the orchestrator will then SIGINT
   the other three.
+
+---
+
+## Simple setup (recommended for high-rate arm control)
+
+The orchestrator's four-process design splits Mujoco (`mujoco_dds_bridge`) from
+the policy (`fame_dds_runner`) so each is independently restartable. That is
+useful but heavier than necessary. The simple path collapses
+those two into a single process:
+
+```
+                                              ┌── safety_layer (split) ───────┐
+arm_joint_stream / ik_repl /                  │  sub lowcmd_lower_in           │
+  arm_controller_goto                ────────►│  sub lowcmd_upper_in           │
+   pub rt/safety/lowcmd_upper_in              │  merge → pub rt/lowcmd         │
+                                              └────────────────────────────────┘
+                                                       │
+                                              ┌────────▼────────────────────┐
+                                              │  fame_mujoco_dds            │
+                                              │    Mujoco loop + RMA policy │
+                                              │    pub rt/lowstate          │
+                                              │    pub rt/safety/lowcmd_lower_in (legs)
+                                              │    sub rt/lowcmd (arm slot only)
+                                              └─────────────────────────────┘
+```
+
+### Bring the stack up (two terminals)
+
+```bash
+# Terminal A — safety_layer + unified FAME-Mujoco-DDS
+cd src/h12_fame_ik_runner
+./scripts/simple_run.sh                            # bare H1-2, viewer on
+./scripts/simple_run.sh configs/h1_2_fame_ik_magpie.yaml
+./scripts/simple_run.sh configs/h1_2_fame_ik.yaml --headless
+```
+
+The script:
+1. Starts `h12_safety_layer` with `configs/sim_safety_split.yaml` (relaxed
+   estop ranges so a transient leg sag during FAME warm-up does not trip the
+   relay).
+2. Starts `fame_mujoco_dds` with the chosen scene. Mujoco runs in-process; the
+   leg PD uses the RMA policy output directly, the arm PD follows whatever the
+   merged `rt/lowcmd` carries on motors 12..26 (defaulting to
+   `default_angles_arms` until an upstream publisher is online).
+
+`Ctrl-C` in Terminal A tears down both processes. The viewer (when not
+`--headless`) responds to the standard MuJoCo bindings — `Space` to pause the
+sim, `.` to single-step while paused.
+
+> Yutong suggests "lower the robot using `.` and release the band by pressing
+> space", although this assumes a scene with a tether equality constraint named `band`.
+> The H1-2 scenes in this repo don't ship that constraint, so on the standard
+> scenes those keys behave as the MuJoCo defaults (`Space` = pause,
+> `.` = single-step). If you build a custom scene with a tether, you can drop
+> it into `configs/<your>.yaml::mujoco.xml_path` and the bindings will work
+> as described.
+
+### Drive the arms (Terminal B)
+
+Once Terminal A is up, in a second terminal run **one** of these:
+
+```bash
+cd src/h12_fame_ik_runner
+
+# (a) Raw joint streaming — high-bandwidth, no IK in the loop.
+./scripts/arm_stream.sh                            # uses configs/h1_2_fame_ik.yaml
+
+# (b) Frame-task REPL — same as before; 6-DOF EE targets with FrameController IK.
+./scripts/ik_repl.sh
+
+# (c) arm_controller_goto.py from h12_ros2_controller — Yutong's suggestion. Same UX (xyz + RPY in degrees) but lives in the other repo.
+./scripts/arm_goto.sh
+```
+
+### High-bandwidth joint commands: `arm_stream`
+
+The streamer replaces the goal-and-converge loop with a "whatever `q_des` is
+right now, send it" loop. The publisher thread always pushes the **latest**
+`q_des` at 500 Hz; REPL commands (or external Python callers using the
+`ArmJointStream` class directly) mutate `q_des` and the next tick — within
+2 ms — sends the update. There is no waiting for IK convergence, no
+goal cancellation, no per-command timeout.
+
+```
+arm> help
+[arm] commands
+  show                           - print q_des, kp/kd, and current q from rt/lowstate
+  names                          - list all 15 arm-joint names and indices
+  set <joint> <radians>          - set ONE joint by name or index (in radians)
+  setdeg <joint> <degrees>       - same in degrees
+  nudge <joint> <delta_radians>  - add delta_radians to ONE joint (sign matters)
+  setall  <q0> <q1> ... <q14>    - set all 15 joints (radians)
+  setall_deg <q0> ... <q14>      - set all 15 joints (degrees)
+  home                           - all zeros (arms straight down, torso=0)
+  default                        - restore default_angles_arms from the YAML
+  gain kp <value>                - set kp on all 15 motors
+  gain kd <value>                - set kd on all 15 motors
+  quit / exit
+```
+
+Joint aliases (case-insensitive):
+
+  `torso`, `lsp lsr lsy le lwr lwp lwy`, `rsp rsr rsy re rwr rwp rwy`.
+
+The 15-vector ordering matches motor IDs 12..26 in the H1-2 LowCmd:
+`[torso, L_shoulder_pitch/roll/yaw, L_elbow, L_wrist_roll/pitch/yaw,
+R_shoulder_pitch/roll/yaw, R_elbow, R_wrist_roll/pitch/yaw]`.
+
+A typical scripted move:
+
+```
+arm> show
+  ...
+  1 left_shoulder_pitch_joint    q_des=-0.900 rad ( -51.6 deg)  kp=500.0  kd=5.00
+  ...
+arm> setdeg lsp -40
+arm> setdeg le 80
+arm> setdeg rsp -40
+arm> setdeg re 80
+arm> show          # confirms q_meas tracking q_des
+arm> quit
+```
+
+Programmatic use:
+
+```python
+from h12_fame_ik_runner.arm_joint_stream import ArmJointStream, ARM_ALIASES
+import numpy as np
+
+stream = ArmJointStream(
+    topic="rt/safety/lowcmd_upper_in",
+    domain_id=0, interface=None,
+    default_arm_q=np.zeros(15, dtype=np.float32),
+    default_arm_kp=np.full(15, 50.0, dtype=np.float32),
+    default_arm_kd=np.full(15, 5.0, dtype=np.float32),
+)
+stream.start()
+for q_des in trajectory:                    # any iterable of shape (15,) arrays
+    stream.set_all(q_des)
+    time.sleep(0.02)                        # 50 Hz teleop, the publisher fills the gaps at 500 Hz
+stream.shutdown()
+```
+
+This is the API to wire into a teleoperation source, a recorded trajectory
+replay, or anything else that produces a stream of arm-joint targets.
 
 ---
 
