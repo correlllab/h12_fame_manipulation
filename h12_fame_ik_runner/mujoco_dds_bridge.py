@@ -148,9 +148,11 @@ class MujocoDDSBridge:
         self._low_state.mode_machine = 6
 
         self._running = False
-        self._state_thread = threading.Thread(
-            target=self._publish_state_loop, name="mjbridge_state_pub", daemon=True
-        )
+        # State pub happens from the MAIN thread inside the step loop so MjData
+        # is only touched from one thread (it is NOT safe for concurrent
+        # access). With sim_dt=2ms the natural state-pub rate is 500 Hz.
+        self._state_pub_decim = max(1, int(round(1.0 / (500.0 * self._sim_dt))))
+        self._step_counter = 0
         self._tick = 0
         self._cmd_msg_count = 0
         self._first_cmd_time = 0.0
@@ -179,17 +181,9 @@ class MujocoDDSBridge:
 
     # ----------------------------------------------------------- State publish
 
-    def _publish_state_loop(self) -> None:
-        dt = 1.0 / 500.0
-        while self._running:
-            t0 = time.time()
-            self._fill_and_publish_low_state()
-            time.sleep(max(0.0, dt - (time.time() - t0)))
-
     def _fill_and_publish_low_state(self) -> None:
-        # Snapshot mujoco state — this read is not strictly thread-safe with
-        # mj_step, but at 500 Hz vs 500 Hz sim rate the worst case is a
-        # one-sample tear which is fine for LowState consumers.
+        # Called from the main step thread, right after mj_step. Safe to read
+        # MjData here because no other thread touches it.
         q = self._d.qpos[self._h12_qpos_adr]
         dq = self._d.qvel[self._h12_qvel_adr]
         # Body-frame angular velocity for the IMU. d.qvel[3:6] for a free joint
@@ -243,12 +237,14 @@ class MujocoDDSBridge:
     def _step_once(self) -> None:
         self._apply_pd_to_ctrl()
         mujoco.mj_step(self._m, self._d)
+        self._step_counter += 1
+        if self._step_counter % self._state_pub_decim == 0:
+            self._fill_and_publish_low_state()
 
     # ------------------------------------------------------------- Entrypoint
 
     def run(self) -> None:
         self._running = True
-        self._state_thread.start()
         print(
             f"[bridge] scene={self._xml_path.name} headless={self._headless} "
             f"low_state={self._low_state_topic} low_cmd_in={self._low_cmd_topic}",
@@ -314,10 +310,6 @@ class MujocoDDSBridge:
 
     def shutdown(self) -> None:
         self._running = False
-        try:
-            self._state_thread.join(timeout=1.0)
-        except RuntimeError:
-            pass
         try:
             self._cmd_sub.Close()
         except Exception:
