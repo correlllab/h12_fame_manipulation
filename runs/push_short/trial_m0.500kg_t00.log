@@ -1,0 +1,73 @@
+[orchestrator] starting safety: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python /home/niraj/isaac_gym_projects/h12_safety_layer/h12_safety_layer/script/safety_layer_main.py --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/sim_safety_split.yaml
+[orchestrator] starting bridge: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.mujoco_dds_bridge --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml --headless --duration 35.0
+[bridge] [bridge] PUSH_BLOCK_MASS override: 0.5000 -> 0.5000 kg (inertia x1.000)
+[bridge] [bridge] scene=h1_2_table.xml headless=True low_state=rt/lowstate low_cmd_in=rt/lowcmd
+[bridge] [bridge] warmup: holding sim frozen up to 6.00s or until first FAME leg cmd lands
+[orchestrator] starting fame: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.fame_dds_runner --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[fame] [fame] loaded encoder /home/niraj/isaac_gym_projects/h12_fame_manipulation/h12_fame_ik_runner/ckpts/handless/encoder_3999.pt
+[fame] [fame] low_state=rt/lowstate low_cmd_out=rt/safety/lowcmd_lower_in decim=10 pub_hz=500.0
+[bridge] [bridge] warmup done (first leg cmd at t+1.35s); stepping physics now
+[orchestrator] starting ik: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.ik_dds_driver --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[ik] [ik] urdf=h1_2_handless.urdf controller_config=sim_split_controller.yaml
+[ik] StateSubscriber initialized.
+[ik] LowCmdPublisher initialized.
+[ik] All joints are locked in the initial position.
+[ik] [ik] batch mode; goals=['named:home', 'frame:right', 'named:home']
+[ik] [ik] goal=named:home for 5.0s
+[ik] [ik] goal=frame:right_wrist_yaw_link pose_xyz=(+0.650,-0.300,+0.180) rpy_deg=(+0.0,+0.0,+0.0) max=15.0s
+[ik] [ik] driving frame_task on right_wrist_yaw_link; xyz=(+0.650,-0.300,+0.180) rpy_deg=(+0.0,+0.0,+0.0) timeout=15.0s
+[ik] [ik]   linear=0.4299 m  angular=0.0122 rad
+[ik] [ik]   linear=0.3509 m  angular=0.0117 rad
+[ik] [ik]   linear=0.2765 m  angular=0.0015 rad
+[ik] [ik]   linear=0.2203 m  angular=0.0025 rad
+[ik] [ik]   linear=0.1870 m  angular=0.0056 rad
+[ik] [ik]   linear=0.1676 m  angular=0.0049 rad
+[ik] [ik]   linear=0.1551 m  angular=0.0044 rad
+[ik] [ik]   linear=0.1477 m  angular=0.0042 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0033 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik]   linear=0.1453 m  angular=0.0030 rad
+[ik] [ik] goal=named:home for 8.0s
+[bridge] [bridge] summary:
+[bridge]   elapsed_s=35.00
+[bridge]   low_cmd_msgs_received=12548 (first at t+0.00s)
+[bridge]   base_xyz=[-0.757089647639751, 0.09123147970606409, 0.0727367440540684]
+[bridge]   q_des[0:12]=[-0.08185020089149475, 0.25340911746025085, -0.07645194232463837, 0.3599785566329956, 0.2296433001756668, -0.16179899871349335, -0.14599190652370453, -0.26128387451171875, -0.2187494933605194, 0.15115609765052795, -0.7973340153694153, -0.03305608779191971]
+[bridge]   q_now[0:12]=[-0.056320877785428866, -0.1286302572849944, -0.060810070798221066, 0.1941774007820769, 0.1613645869188196, -0.1707955752348749, -0.16054059164110596, -0.10147186873314035, -0.24546995990803855, 0.17219523757155208, -0.7997403277790026, -0.0398358863170731]
+[bridge]   q_des[13:20]=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # left arm
+[bridge]   q_now[13:20]=[-0.0006184999624799648, -0.003500265584865228, -0.001204541588551595, 0.0033810357033810558, -7.233912725499375e-05, -0.00016774172158930733, -0.0002550739931538141]
+[bridge]   q_des[20:27]=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # right arm
+[bridge]   q_now[20:27]=[0.00011715275688619293, -0.003638682124323202, -0.0018038418138276457, 0.0031483521401418323, 0.005732457398748659, -0.005785783188689999, 0.005359154721560475]
+[orchestrator] bridge exited with code 0
+[orchestrator] sending SIGINT to safety (pgid=134286)
+[orchestrator] sending SIGINT to fame (pgid=134379)
+[orchestrator] sending SIGINT to ik (pgid=134935)
+[ik] [ik] interrupted, shutting down
+[ik] StateSubscriber shutdown
+[ik] RobotModel shutdown
+[ik] LowCmdPublisher shutdown.
+[fame] [fame] interrupted, shutting down
+[safety] {"event": "relay_started", "mode": "split_mode"}
+[safety] KeyboardInterrupt received, stopping safety layer...
+[safety] [Reader] take sample error
+[safety] {"event": "relay_stopped"}
+[orchestrator] done

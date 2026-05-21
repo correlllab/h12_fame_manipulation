@@ -1,0 +1,75 @@
+[orchestrator] starting safety: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python /home/niraj/isaac_gym_projects/h12_safety_layer/h12_safety_layer/script/safety_layer_main.py --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/sim_safety_split.yaml
+[orchestrator] starting bridge: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.mujoco_dds_bridge --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml --headless --duration 35.0
+[bridge] [bridge] PUSH_BLOCK_MASS override: 0.5000 -> 0.5000 kg (inertia x1.000)
+[bridge] [bridge] scene=h1_2_table.xml headless=True low_state=rt/lowstate low_cmd_in=rt/lowcmd
+[bridge] [bridge] warmup: holding sim frozen up to 6.00s or until first FAME leg cmd lands
+[orchestrator] starting fame: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.fame_dds_runner --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[fame] [fame] loaded encoder /home/niraj/isaac_gym_projects/h12_fame_manipulation/h12_fame_ik_runner/ckpts/handless/encoder_3999.pt
+[fame] [fame] low_state=rt/lowstate low_cmd_out=rt/safety/lowcmd_lower_in decim=10 pub_hz=500.0
+[bridge] [bridge] warmup done (first leg cmd at t+1.33s); stepping physics now
+[orchestrator] starting ik: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.ik_dds_driver --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[ik] [ik] urdf=h1_2_handless.urdf controller_config=sim_split_controller.yaml
+[ik] StateSubscriber initialized.
+[ik] LowCmdPublisher initialized.
+[ik] All joints are locked in the initial position.
+[ik] [ik] batch mode; goals=['named:home', 'frame_delta:right', 'named:home']
+[ik] [ik] goal=named:home for 5.0s
+[ik] [ik] goal=frame_delta:right_wrist_yaw_link  current=(+0.246,-0.121,+0.178)  delta=(+0.250,+0.000,+0.000)  target=(+0.496,-0.121,+0.178)  max=15.0s
+[ik] [ik] driving frame_task on right_wrist_yaw_link; xyz=(+0.496,-0.121,+0.178) rpy_deg=(-5.2,-17.3,+20.4) timeout=15.0s
+[ik] [ik]   linear=0.2856 m  angular=0.4303 rad
+[ik] [ik]   linear=0.1964 m  angular=0.0032 rad
+[ik] [ik]   linear=0.1220 m  angular=0.0024 rad
+[ik] [ik]   linear=0.0729 m  angular=0.0032 rad
+[ik] [ik]   linear=0.0501 m  angular=0.0022 rad
+[ik] [ik]   linear=0.0296 m  angular=0.0012 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/lib/python3.10/site-packages/pink/limits/acceleration_limit.py:166: RuntimeWarning: invalid value encountered in sqrt
+[ik]   dt * np.sqrt(2 * self.a_max * Delta_q_min),
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik]   linear=0.0258 m  angular=0.0078 rad
+[ik] [ik] goal=named:home for 8.0s
+[bridge] [bridge] summary:
+[bridge]   elapsed_s=35.00
+[bridge]   low_cmd_msgs_received=12124 (first at t+0.00s)
+[bridge]   base_xyz=[-0.7852584585384856, 0.09327298339462681, 0.20485555983407852]
+[bridge]   q_des[0:12]=[-0.33000001311302185, 0.47358638048171997, 0.11181823164224625, 0.8737655878067017, 0.2665623426437378, 0.07225479185581207, -0.33000001311302185, 0.4255291223526001, -0.1774255633354187, 0.5592394471168518, -0.38047361373901367, 0.0394287183880806]
+[bridge]   q_now[0:12]=[-0.4245653718557051, 0.003425404127753948, 0.1218359248516108, 0.7466544240243166, 0.48677410399544135, 0.1000337782828192, -0.1599406358891862, 0.38432542167239747, -0.35761823891190897, 0.5524384919075589, -0.29598422939798663, 0.05436836147256297]
+[bridge]   q_des[13:20]=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # left arm
+[bridge]   q_now[13:20]=[0.0115168853144339, -0.05218296945352423, -0.016792038336462343, 0.001751598119273928, -0.00015303820886012305, -0.002570422172106242, -0.00027856740983573427]
+[bridge]   q_des[20:27]=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # right arm
+[bridge]   q_now[20:27]=[0.026725555701490326, -0.0527450442912966, -0.015733516837059487, 0.0032017108096335438, -0.00046506449764583936, -0.00562790383514992, 0.004769171898491081]
+[orchestrator] bridge exited with code 0
+[orchestrator] sending SIGINT to safety (pgid=252681)
+[orchestrator] sending SIGINT to fame (pgid=252774)
+[orchestrator] sending SIGINT to ik (pgid=253330)
+[ik] [ik] interrupted, shutting down
+[ik] StateSubscriber shutdown
+[ik] RobotModel shutdown
+[fame] [fame] interrupted, shutting down
+[ik] LowCmdPublisher shutdown.
+[safety] {"event": "relay_started", "mode": "split_mode"}
+[safety] KeyboardInterrupt received, stopping safety layer...
+[safety] [Reader] take sample error
+[safety] {"event": "relay_stopped"}
+[orchestrator] done

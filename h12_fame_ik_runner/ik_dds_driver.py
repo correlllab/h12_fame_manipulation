@@ -86,41 +86,176 @@ def _make_frame_controller(runner_yaml: dict, cfg_dir: Path) -> FrameController:
     )
 
 
+def _goal_label(goal: dict) -> str:
+    if "name" in goal:
+        return f"named:{goal['name']}"
+    if "frame_delta" in goal:
+        return f"frame_delta:{goal['frame_delta']}"
+    if "frame" in goal:
+        return f"frame:{goal['frame']}"
+    if "q_reduced" in goal:
+        return f"q_reduced[{len(goal['q_reduced'])}]"
+    return f"unknown:{goal}"
+
+
+def _resolve_frame_link(frame: str) -> str:
+    return FRAME_ALIASES.get(frame, frame)
+
+
+def _parse_yaml_pose(pose: list[float]) -> np.ndarray:
+    """YAML pose is [x, y, z, R_deg, P_deg, Y_deg] — convert RPY to radians."""
+    if len(pose) != 6:
+        raise ValueError(f"frame goal pose must have 6 values; got {len(pose)}")
+    vals = [float(v) for v in pose]
+    vals[3:] = list(np.deg2rad(vals[3:]))
+    return np.asarray(vals, dtype=np.float64)
+
+
 def run_batch(
     frame_controller: FrameController,
     goals: list[dict],
     duration_cap: float,
 ) -> None:
+    """Step through ``goals``. Each goal is one of
+
+        {name: <named_config>, seconds: <float>}
+        {frame: <alias_or_link>, pose: [x y z R_deg P_deg Y_deg], seconds: <float>,
+         linear_thresh: <float, opt>, angular_thresh: <float, opt>}
+        {frame_delta: <alias_or_link>, delta: [dx dy dz dR_deg dP_deg dY_deg],
+         seconds: <float>, linear_thresh: <float, opt>, angular_thresh: <float, opt>}
+        {q_reduced: <len-14 list of floats>, seconds: <float>}
+
+    Named goals hold the reduced configuration for the full ``seconds``.
+    Frame goals push the wrist toward the absolute 6-DOF pose using the IK
+    frame_task path and exit early on convergence.
+    frame_delta goals read the link's CURRENT IK-frame pose, add the delta,
+    and drive frame_task toward that target. Use this for "move 20 cm in +x
+    from wherever you are now" — the result is a clean straight-line motion
+    in IK-frame coordinates regardless of starting pose. Absolute frame
+    goals are sensitive to URDF/MJCF kinematic mismatch and body attitude.
+    q_reduced goals bypass IK entirely and command an explicit upper-body
+    joint vector (ENABLED_JOINTS order: 7 left arm + 7 right arm).
+    """
     start = time.time()
-    last_q = None
-    print(f"[ik] batch mode; goals={[g['name'] for g in goals]}", flush=True)
+    last_named_q = None
+    print(f"[ik] batch mode; goals={[_goal_label(g) for g in goals]}", flush=True)
     for goal in goals:
-        name = goal["name"]
         seconds = float(goal.get("seconds", 5.0))
-        if name not in NAMED_CONFIGS:
+        if "name" in goal:
+            name = goal["name"]
+            if name not in NAMED_CONFIGS:
+                print(
+                    f"[ik] skipping unknown named goal {name}; valid: {list(NAMED_CONFIGS)}",
+                    flush=True,
+                )
+                continue
+            q_reduced = NAMED_CONFIGS[name]
+            last_named_q = q_reduced
+            print(f"[ik] goal=named:{name} for {seconds:.1f}s", flush=True)
+            t_goal = time.time()
+            while time.time() - t_goal < seconds:
+                step_start = time.time()
+                frame_controller.goto_reduced_configuration(q_reduced)
+                if duration_cap > 0 and (time.time() - start) >= duration_cap:
+                    return
+                sleep_for = frame_controller.dt - (time.time() - step_start)
+                if sleep_for > 0:
+                    time.sleep(sleep_for)
+        elif "q_reduced" in goal:
+            try:
+                q_reduced = np.asarray(goal["q_reduced"], dtype=np.float64)
+            except (TypeError, ValueError) as exc:
+                print(f"[ik] skipping malformed q_reduced goal: {exc}", flush=True)
+                continue
+            last_named_q = q_reduced
             print(
-                f"[ik] skipping unknown goal {name}; valid: {list(NAMED_CONFIGS)}",
+                f"[ik] goal=q_reduced[{q_reduced.shape[0]}] for {seconds:.1f}s  "
+                f"q={np.array2string(q_reduced, precision=3, separator=',')}",
                 flush=True,
             )
+            t_goal = time.time()
+            while time.time() - t_goal < seconds:
+                step_start = time.time()
+                frame_controller.goto_reduced_configuration(q_reduced)
+                if duration_cap > 0 and (time.time() - start) >= duration_cap:
+                    return
+                sleep_for = frame_controller.dt - (time.time() - step_start)
+                if sleep_for > 0:
+                    time.sleep(sleep_for)
+        elif "frame_delta" in goal:
+            link = _resolve_frame_link(goal["frame_delta"])
+            try:
+                delta = _parse_yaml_pose(goal["delta"])
+            except (KeyError, ValueError) as exc:
+                print(f"[ik] skipping malformed frame_delta goal {goal}: {exc}",
+                      flush=True)
+                continue
+            try:
+                current = frame_controller.get_frame_pose(link)
+            except Exception as exc:
+                print(f"[ik] could not read current pose of {link}: {exc}",
+                      flush=True)
+                continue
+            target = np.asarray(current, dtype=np.float64) + delta
+            lin_thr = float(goal.get("linear_thresh", 5e-3))
+            ang_thr = float(goal.get("angular_thresh", 2e-2))
+            print(
+                f"[ik] goal=frame_delta:{link}  "
+                f"current=({current[0]:+.3f},{current[1]:+.3f},{current[2]:+.3f})  "
+                f"delta=({delta[0]:+.3f},{delta[1]:+.3f},{delta[2]:+.3f})  "
+                f"target=({target[0]:+.3f},{target[1]:+.3f},{target[2]:+.3f})  "
+                f"max={seconds:.1f}s",
+                flush=True,
+            )
+            _drive_frame_task(
+                frame_controller, link, target, seconds,
+                linear_thresh=lin_thr, angular_thresh=ang_thr,
+            )
+            if duration_cap > 0 and (time.time() - start) >= duration_cap:
+                return
+        elif "frame" in goal:
+            link = _resolve_frame_link(goal["frame"])
+            try:
+                pose = _parse_yaml_pose(goal["pose"])
+            except (KeyError, ValueError) as exc:
+                print(f"[ik] skipping malformed frame goal {goal}: {exc}", flush=True)
+                continue
+            lin_thr = float(goal.get("linear_thresh", 5e-3))
+            ang_thr = float(goal.get("angular_thresh", 2e-2))
+            print(
+                f"[ik] goal=frame:{link} pose_xyz=({pose[0]:+.3f},{pose[1]:+.3f},{pose[2]:+.3f}) "
+                f"rpy_deg=({np.rad2deg(pose[3]):+.1f},{np.rad2deg(pose[4]):+.1f},{np.rad2deg(pose[5]):+.1f}) "
+                f"max={seconds:.1f}s",
+                flush=True,
+            )
+            _drive_frame_task(
+                frame_controller, link, pose, seconds,
+                linear_thresh=lin_thr, angular_thresh=ang_thr,
+            )
+            if duration_cap > 0 and (time.time() - start) >= duration_cap:
+                return
+        else:
+            print(f"[ik] skipping goal with no name/frame/frame_delta/q_reduced key: {goal}",
+                  flush=True)
             continue
-        q_reduced = NAMED_CONFIGS[name]
-        last_q = q_reduced
-        print(f"[ik] goal={name} for {seconds:.1f}s", flush=True)
-        t_goal = time.time()
-        while time.time() - t_goal < seconds:
+
+    # After the schedule, hold either the last named config (if any) or the
+    # last IK solution (frame_task already left the controller at that pose).
+    if last_named_q is not None:
+        print("[ik] holding last named goal until interrupted", flush=True)
+        while True:
             step_start = time.time()
-            frame_controller.goto_reduced_configuration(q_reduced)
+            frame_controller.goto_reduced_configuration(last_named_q)
             if duration_cap > 0 and (time.time() - start) >= duration_cap:
                 return
             sleep_for = frame_controller.dt - (time.time() - step_start)
             if sleep_for > 0:
                 time.sleep(sleep_for)
-
-    if last_q is not None:
-        print("[ik] holding final goal until interrupted", flush=True)
+    else:
+        print("[ik] holding last frame_task pose until interrupted", flush=True)
         while True:
             step_start = time.time()
-            frame_controller.goto_reduced_configuration(last_q)
+            frame_controller.control_step_reduced(com=False)
             if duration_cap > 0 and (time.time() - start) >= duration_cap:
                 return
             sleep_for = frame_controller.dt - (time.time() - step_start)

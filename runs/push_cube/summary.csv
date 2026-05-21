@@ -1,0 +1,2 @@
+mass_kg,trial_idx,rc,wall_seconds,success,reason,block_x0,block_xN,block_x_max,block_z_min,pelvis_z0,pelvis_zN,pelvis_z_min,csv
+0.5,0,0,36.77080678939819,0,block stopped at x=0.563 < 0.600,0.45,0.56332,0.56633,1.06664,1.02996,0.81544,0.80435,runs/push_cube/trial_m0.500kg_t00.csv

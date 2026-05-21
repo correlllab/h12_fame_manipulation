@@ -1,0 +1,4 @@
+mass_kg,trial_idx,rc,wall_seconds,success,reason,block_x0,block_xN,block_x_max,block_z_min,pelvis_z0,pelvis_zN,pelvis_z_min,csv
+0.5,0,0,36.76913571357727,0,robot fell (min pelvis z=0.072 < 0.650),0.45,0.45,0.45,0.97609,1.02996,0.07275,0.0724,runs/push_delta_repro/trial_m0.500kg_t00.csv
+0.5,1,0,36.810436964035034,0,robot fell (min pelvis z=0.073 < 0.650),0.45,0.45,0.45,0.97609,1.02996,0.07276,0.07275,runs/push_delta_repro/trial_m0.500kg_t01.csv
+0.5,2,0,36.769365072250366,0,robot fell (min pelvis z=0.082 < 0.650),0.45,0.45,0.45,0.97609,1.02996,0.0817,0.0817,runs/push_delta_repro/trial_m0.500kg_t02.csv

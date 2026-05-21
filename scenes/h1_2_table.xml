@@ -20,37 +20,60 @@
               texrepeat="5 5" reflectance="0.2"/>
     <material name="table_top" rgba="0.55 0.42 0.28 1.0" reflectance="0.05"/>
     <material name="table_leg" rgba="0.30 0.22 0.15 1.0" reflectance="0.05"/>
+    <material name="push_block" rgba="0.85 0.20 0.20 1.0" reflectance="0.1"/>
   </asset>
 
   <worldbody>
     <light pos="1 0 3.5" dir="0 0 -1" directional="true"/>
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
-    <!-- Workbench: 71 3/4" x 29 1/2" x 29 1/8" (1.82245 x 0.7493 x 0.73978 m).
-         Length aligned along y (wide across robot's front).
-         Near edge at x = 0.55 m: clears the arms-at-default pose (left wrist
-         sits at ~x=0.47 with shoulder pitched -0.9 / elbow 0.5). With near-edge
-         at 0.35 m the front legs caught the wrists and the robot drifted.
-         Top surface at z = 0.73978 m.
-         Built as 4 legs + a slab top so the robot can reach UNDER the table
-         (a single solid box would block the chest cavity at floor level). -->
-    <body name="table" pos="0.92465 0 0">
-      <!-- top slab: 0.7493 (x) * 1.82245 (y) * 0.04 (z), centered at z=0.71978 (so top face at z=0.73978) -->
+    <!-- Workbench: 71 3/4" x 29 1/2" x 36 1/16" (1.82245 x 0.7493 x 0.91695 m).
+         Length aligned along y. Near edge at world x = 0.30 m, ~2 cm clear
+         of the right wrist at FAME's crouch (wrist at world x≈0.28).
+         Top surface at z = 0.91695 — 8 cm lower than the original 39 1/4"
+         build. The shorter table puts the top BELOW the wrist's natural
+         crouch z (~0.98), so the wrist sits 6 cm above the slab. Block
+         sits on top, with the wrist landing INSIDE its z range (block z
+         from 0.917 to 1.037; wrist z 0.98) — clean side push, not glance. -->
+    <body name="table" pos="0.67465 0 0">
+      <!-- top slab: 0.7493 (x) * 1.82245 (y) * 0.04 (z), centered at z=0.89695 (top face at z=0.91695) -->
       <geom name="table_top" type="box"
             size="0.37465 0.911225 0.02"
-            pos="0 0 0.71978"
+            pos="0 0 0.89695"
             material="table_top"
             friction="1.0 0.005 0.0001"/>
-      <!-- four legs: 0.06 x 0.06 cross-section, from floor up to underside of top slab (z=0.69978).
-           Leg half-height = 0.34989; placed at the four inner corners (1 cm inset from top edges). -->
-      <geom name="table_leg_lf" type="box" size="0.03 0.03 0.34989"
-            pos=" 0.34465  0.881225 0.34989" material="table_leg"/>
-      <geom name="table_leg_rf" type="box" size="0.03 0.03 0.34989"
-            pos=" 0.34465 -0.881225 0.34989" material="table_leg"/>
-      <geom name="table_leg_lb" type="box" size="0.03 0.03 0.34989"
-            pos="-0.34465  0.881225 0.34989" material="table_leg"/>
-      <geom name="table_leg_rb" type="box" size="0.03 0.03 0.34989"
-            pos="-0.34465 -0.881225 0.34989" material="table_leg"/>
+      <!-- four legs: 0.06 x 0.06 cross-section, floor to underside of slab (z=0.87695).
+           Leg half-height = 0.438475; placed at the four inner corners (1 cm inset from top edges). -->
+      <geom name="table_leg_lf" type="box" size="0.03 0.03 0.438475"
+            pos=" 0.34465  0.881225 0.438475" material="table_leg"/>
+      <geom name="table_leg_rf" type="box" size="0.03 0.03 0.438475"
+            pos=" 0.34465 -0.881225 0.438475" material="table_leg"/>
+      <geom name="table_leg_lb" type="box" size="0.03 0.03 0.438475"
+            pos="-0.34465  0.881225 0.438475" material="table_leg"/>
+      <geom name="table_leg_rb" type="box" size="0.03 0.03 0.438475"
+            pos="-0.34465 -0.881225 0.438475" material="table_leg"/>
+    </body>
+
+    <!-- Pushable block — 30 cm CUBE (wide footprint, tall enough to
+         intercept the wrist's natural arc). Not a pillar (12×12×30 was
+         too narrow); not a flat slab (30×30×14 had its top 10 cm below
+         the wrist arc peak). A 30 cm cube has the wide x/y catch-area
+         AND a top at z=1.217 — well above the wrist arc peak (z≈1.16):
+            wrist home (world)   ≈ (0.27, -0.11, 0.98)
+            block center (world)   (0.45, -0.05, 1.067)
+            block x-range          [0.30, 0.60]   back face 3 cm forward of wrist
+            block y-range          [-0.20, +0.10]   wrist y=-0.11 inside
+            block z-range          [0.917, 1.217]   sits on table; spans wrist arc
+         Mass overridden at reset by PUSH_BLOCK_MASS env var. Default 0.5 kg
+         over the 0.027 m³ volume = density 18.5 kg/m³ (like cork / hollow
+         plastic crate). -->
+    <body name="push_block" pos="0.45 -0.05 1.067">
+      <freejoint name="push_block_free"/>
+      <geom name="push_block_geom" type="box"
+            size="0.15 0.15 0.15"
+            mass="0.5"
+            material="push_block"
+            friction="1.0 0.005 0.0001"/>
     </body>
   </worldbody>
 </mujoco>

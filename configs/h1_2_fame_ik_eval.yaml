@@ -1,0 +1,127 @@
+# Eval config: push a block from A to B with the right wrist while FAME holds
+# the lower body upright. Mirrors h1_2_fame_ik.yaml except for the ik.goals
+# trajectory below — keep the two files in sync if you change non-trajectory
+# fields (warmup, paths, FAME params, etc).
+
+mujoco:
+  xml_path: "../scenes/h1_2_table.xml"
+  simulation_dt: 0.002
+  headless: false
+  duration: 0.0
+  warmup_seconds: 6.0
+
+robot:
+  num_h12_motors: 27
+  num_leg_motors: 12
+  default_q:
+    [-0.16, 0.0, 0.0,  0.36, -0.2, 0.0,
+     -0.16, 0.0, 0.0,  0.36, -0.2, 0.0,
+      0.0,
+     -0.0,  0.0, 0.0,  0.0,  0.0,  0.0, 0.0,
+     -0.0,  0.0, 0.0,  0.0,  0.0,  0.0, 0.0]
+  # NB: leg kp must match what FAME was trained with — bumping it 1.2x in an
+  # experiment caused FAME to over-correct and tip during the home crouch
+  # (pitched -26° vs -17° baseline, fell at t≈7s). Keep these values matched
+  # to the original h1_2_fame_ik.yaml unless retraining FAME.
+  default_kp:
+    [200, 200, 200, 300,  60,  40,
+     200, 200, 200, 300,  60,  40,
+     200,
+     500, 500, 500, 500, 500, 500, 500,
+     500, 500, 500, 500, 500, 500, 500]
+  default_kd:
+    [5.0, 5.0, 5.0, 7.5, 1.0, 0.3,
+     5.0, 5.0, 5.0, 7.5, 1.0, 0.3,
+     10.0,
+     5.0, 5.0, 5.0, 7.5, 1.0, 0.3, 0.0,
+     5.0, 5.0, 5.0, 7.5, 1.0, 0.3, 0.0]
+
+topics:
+  low_state: "rt/lowstate"
+  low_cmd_out: "rt/lowcmd"
+  low_cmd_lower_in: "rt/safety/lowcmd_lower_in"
+  low_cmd_upper_in: "rt/safety/lowcmd_upper_in"
+network:
+  domain_id: 0
+  interface: ""
+
+fame:
+  policy_path: "../h12_fame_ik_runner/ckpts/handless/policy.pt"
+  encoder_path: "../h12_fame_ik_runner/ckpts/handless/encoder_3999.pt"
+  policy_num_joints: 27
+  obs_history_len: 3
+  num_obs: 252
+  single_obs_dim: 76
+  num_actions: 12
+  ang_vel_scale: 0.25
+  dof_pos_scale: 1.0
+  dof_vel_scale: 0.05
+  action_scale: 0.25
+  cmd_scale: [2.0, 2.0, 0.25]
+  cmd_init: [0.0, 0.0, 0.0]
+  height_cmd: 0.80
+  control_decimation: 10
+  publish_hz: 500.0
+  default_angles_legs:
+    [-0.16, 0.0, 0.0, 0.36, -0.2, 0.0,
+     -0.16, 0.0, 0.0, 0.36, -0.2, 0.0]
+  default_angles_arms:
+    [0.0,
+     -0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+     -0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  # FAME embeds this in each LowCmd, so this is the kp actually in effect
+  # during operation; default_kp[:12] above only governs warmup.
+  # IMPORTANT: must match the kp FAME was trained at — see note above.
+  legs_kp:
+    [200, 200, 200, 300, 60, 40,
+     200, 200, 200, 300, 60, 40]
+  legs_kd:
+    [5.0, 5.0, 5.0, 7.5, 1.0, 0.3,
+     5.0, 5.0, 5.0, 7.5, 1.0, 0.3]
+  left_hand_force: [0.0, 0.0, 0.0]
+  right_hand_force: [0.0, 0.0, 0.0]
+  no_encode: true
+
+ik:
+  controller_config: "sim_split_controller.yaml"
+  urdf_path:           "../../h12_ros2_controller/assets/h1_2/h1_2_handless.urdf"
+  urdf_sphere_path:    "../../h12_ros2_controller/assets/h1_2/h1_2_handless_sphere.urdf"
+  srdf_sphere_path:    "../../h12_ros2_controller/assets/h1_2/h1_2_handless_sphere_collision.srdf"
+  handless: true
+  visualize: false
+  # Push trajectory. Block at world (x=0.45, y=-0.15, z≈1.058), 12cm cube.
+  # Upper body starts at all-zero joint angles ("home" named config). A
+  # single Pinocchio frame_task on the right wrist drives it forward to
+  # contact and push the block ~20cm in +x.
+  #
+  # frame_task pose is in the URDF root (pelvis) frame. FAME drives the
+  # pelvis to a tilted crouch (~ world z=0.80, pitch -17°, yaw +21° at
+  # steady state), and the URDF/MJCF kinematics disagree by ≈ 18 cm in x
+  # plus a y/z offset from the body attitude — so target values are not
+  # one-to-one with the desired world wrist position. The push target
+  # below was sized to drive the wrist as far forward as the IK workspace
+  # allows; the actual MuJoCo wrist will land somewhere short of it. Use
+  # this trial as the empirical baseline, then tune the target if needed.
+  #
+  #   1) home: arms at zero, FAME settles
+  #   2) push: right wrist frame_task to (0.55, -0.30, 0.30) pelvis-frame.
+  #      y=-0.30 compensates the +21° body yaw which otherwise shifts the
+  #      wrist ~15 cm to the left. z=0.30 keeps the wrist clearly above
+  #      the table-top slab during the sweep. 15s budget so the IK has
+  #      time to interpolate.
+  #   3) home: arms back to zero
+  goals:
+    - name: "home"
+      seconds: 5.0
+    # frame_delta: read the right wrist's CURRENT IK-frame pose, add
+    # delta, drive there. The IK's "+x in pelvis frame" maps to world
+    # direction (~0.41, +0.59, +0.56) because FAME holds the body at
+    # RPY(-5°, -17°, +21°). Instead of trying to compensate that in the
+    # delta, the block is positioned along this natural arc in the XML
+    # (see push_block body comment) — so a clean delta_x=0.25 drives the
+    # wrist along its native forward direction straight into the block.
+    - frame_delta: "right"
+      delta: [0.25, 0.0, 0.0, 0.0, 0.0, 0.0]
+      seconds: 15.0
+    - name: "home"
+      seconds: 8.0

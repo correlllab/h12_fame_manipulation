@@ -102,6 +102,51 @@ class MujocoDDSBridge:
         self._d = mujoco.MjData(self._m)
         self._m.opt.timestep = self._sim_dt
 
+        # Optional push-block eval hooks. Activated by env vars so the
+        # orchestrator can stay unchanged — set PUSH_BLOCK_MASS=<kg> to
+        # rescale the block's mass/inertia, and BLOCK_LOG_PATH=<csv> to
+        # dump per-step block world pose. Both default to off.
+        self._block_qpos_adr = -1
+        self._block_log_path = os.environ.get("BLOCK_LOG_PATH", "").strip()
+        self._block_log_fh = None
+        self._right_wrist_body_id = mujoco.mj_name2id(
+            self._m, mujoco.mjtObj.mjOBJ_BODY, "right_wrist_yaw_link"
+        )
+        try:
+            block_bid = mujoco.mj_name2id(
+                self._m, mujoco.mjtObj.mjOBJ_BODY, "push_block"
+            )
+        except Exception:
+            block_bid = -1
+        if block_bid >= 0:
+            mass_env = os.environ.get("PUSH_BLOCK_MASS", "").strip()
+            if mass_env:
+                try:
+                    new_mass = float(mass_env)
+                    old_mass = float(self._m.body_mass[block_bid])
+                    if new_mass > 0.0 and old_mass > 0.0:
+                        scale = new_mass / old_mass
+                        self._m.body_mass[block_bid] = new_mass
+                        # uniform-box inertia ∝ mass; keep the shape, rescale magnitude
+                        self._m.body_inertia[block_bid] *= scale
+                        mujoco.mj_setConst(self._m, self._d)
+                        print(
+                            f"[bridge] PUSH_BLOCK_MASS override: {old_mass:.4f} -> {new_mass:.4f} kg"
+                            f" (inertia x{scale:.3f})",
+                            flush=True,
+                        )
+                except ValueError:
+                    print(f"[bridge] ignoring invalid PUSH_BLOCK_MASS={mass_env!r}", flush=True)
+            # Locate qpos slot for telemetry (first 3 floats = world xyz)
+            try:
+                jid = mujoco.mj_name2id(
+                    self._m, mujoco.mjtObj.mjOBJ_JOINT, "push_block_free"
+                )
+                if jid >= 0:
+                    self._block_qpos_adr = int(self._m.jnt_qposadr[jid])
+            except Exception:
+                pass
+
         # First 27 actuators correspond to BODY_JOINTS / JOINT_NAMES (verified
         # against h1_2.xml/scene.xml at runner-creation time).
         if self._d.ctrl.shape[0] < self._num_h12:
@@ -255,6 +300,59 @@ class MujocoDDSBridge:
         self._step_counter += 1
         if self._step_counter % self._state_pub_decim == 0:
             self._fill_and_publish_low_state()
+            self._log_block_pose()
+
+    def _log_block_pose(self) -> None:
+        if not self._block_log_path or self._block_qpos_adr < 0:
+            return
+        if self._block_log_fh is None:
+            try:
+                self._block_log_fh = open(self._block_log_path, "w", buffering=1)
+                self._block_log_fh.write(
+                    "t,block_x,block_y,block_z,base_x,base_y,base_z,"
+                    "base_qw,base_qx,base_qy,base_qz,"
+                    "wrist_x,wrist_y,wrist_z,"
+                    "wrist_qw,wrist_qx,wrist_qy,wrist_qz,"
+                    "rsp_des,rsr_des,rsy_des,rel_des,"
+                    "rsp_now,rsr_now,rsy_now,rel_now\n"
+                )
+            except OSError as exc:
+                print(f"[bridge] could not open BLOCK_LOG_PATH={self._block_log_path}: {exc}",
+                      flush=True)
+                self._block_log_path = ""
+                return
+        a = self._block_qpos_adr
+        bx, by, bz = float(self._d.qpos[a]), float(self._d.qpos[a + 1]), float(self._d.qpos[a + 2])
+        px, py, pz = float(self._d.qpos[0]), float(self._d.qpos[1]), float(self._d.qpos[2])
+        qw, qx, qy, qz = (float(self._d.qpos[3]), float(self._d.qpos[4]),
+                          float(self._d.qpos[5]), float(self._d.qpos[6]))
+        if self._right_wrist_body_id >= 0:
+            wp = self._d.xpos[self._right_wrist_body_id]
+            wq = self._d.xquat[self._right_wrist_body_id]
+            wx, wy, wz = float(wp[0]), float(wp[1]), float(wp[2])
+            wqw, wqx, wqy, wqz = float(wq[0]), float(wq[1]), float(wq[2]), float(wq[3])
+        else:
+            wx = wy = wz = 0.0
+            wqw, wqx, wqy, wqz = 1.0, 0.0, 0.0, 0.0
+        # right-arm joint des/now (indices 20-23 in the 27-motor list)
+        with self._cmd_lock:
+            rsp_d, rsr_d, rsy_d, rel_d = (
+                float(self._latched_q[20]), float(self._latched_q[21]),
+                float(self._latched_q[22]), float(self._latched_q[23]),
+            )
+        rsp_n = float(self._d.qpos[self._h12_qpos_adr[20]])
+        rsr_n = float(self._d.qpos[self._h12_qpos_adr[21]])
+        rsy_n = float(self._d.qpos[self._h12_qpos_adr[22]])
+        rel_n = float(self._d.qpos[self._h12_qpos_adr[23]])
+        t = float(self._d.time)
+        self._block_log_fh.write(
+            f"{t:.4f},{bx:.5f},{by:.5f},{bz:.5f},{px:.5f},{py:.5f},{pz:.5f},"
+            f"{qw:.5f},{qx:.5f},{qy:.5f},{qz:.5f},"
+            f"{wx:.5f},{wy:.5f},{wz:.5f},"
+            f"{wqw:.5f},{wqx:.5f},{wqy:.5f},{wqz:.5f},"
+            f"{rsp_d:.4f},{rsr_d:.4f},{rsy_d:.4f},{rel_d:.4f},"
+            f"{rsp_n:.4f},{rsr_n:.4f},{rsy_n:.4f},{rel_n:.4f}\n"
+        )
 
     # ------------------------------------------------------------- Entrypoint
 
@@ -380,6 +478,12 @@ class MujocoDDSBridge:
             self._state_pub.Close()
         except Exception:
             pass
+        if self._block_log_fh is not None:
+            try:
+                self._block_log_fh.close()
+            except Exception:
+                pass
+            self._block_log_fh = None
 
 
 def _quat_rotate_inverse(quat_wxyz: np.ndarray, v: np.ndarray) -> np.ndarray:
