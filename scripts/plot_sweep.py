@@ -94,7 +94,7 @@ def main() -> None:
     ax.plot(masses, sr, "o-", color="C0", markersize=10)
     ax.set_ylim(-0.05, 1.05)
     ax.set_ylabel("success rate")
-    ax.set_xlabel("block mass (kg)")
+    ax.set_xlabel(xlabel)
     ax.set_title("Robot survived push?  (success = pelvis_z > 0.65 m)")
     ax.set_xscale("log")
     ax.grid(True, alpha=0.3)
@@ -113,16 +113,16 @@ def main() -> None:
         else:
             ax.errorbar(masses, means, yerr=[means - mins, maxes - means],
                         fmt="o-", color=color, markersize=10, capsize=4)
-        ax.set_xscale("log")
+        if use_logx: ax.set_xscale("log")
         ax.set_ylabel(ylabel)
-        ax.set_xlabel("block mass (kg)")
+        ax.set_xlabel(xlabel)
         ax.set_title(title)
         ax.grid(True, alpha=0.3)
     # hide unused axes
     for slot in range(len(panels), len(axes)):
         axes[slot].set_visible(False)
 
-    fig.suptitle(f"FAME disturbance under push  |  {args.summary.parent.name}", fontsize=12)
+    fig.suptitle(f"FAME disturbance vs {args.x}  |  {args.summary.parent.name}", fontsize=12)
     fig.tight_layout()
 
     png = args.summary.with_suffix(".png")
