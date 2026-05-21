@@ -1,0 +1,42 @@
+[orchestrator] starting safety: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python /home/niraj/isaac_gym_projects/h12_safety_layer/h12_safety_layer/script/safety_layer_main.py --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/sim_safety_split.yaml
+[orchestrator] starting bridge: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.mujoco_dds_bridge --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml --headless --duration 10.0
+[bridge] [bridge] PUSH_BLOCK_MASS override: 0.5000 -> 0.5000 kg (inertia x1.000)
+[bridge] [bridge] scene=h1_2_table.xml headless=True low_state=rt/lowstate low_cmd_in=rt/lowcmd
+[bridge] [bridge] warmup: holding sim frozen up to 3.00s or until first FAME leg cmd lands
+[orchestrator] starting fame: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.fame_dds_runner --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[fame] [fame] loaded encoder /home/niraj/isaac_gym_projects/h12_fame_manipulation/h12_fame_ik_runner/ckpts/handless/encoder_3999.pt
+[fame] [fame] low_state=rt/lowstate low_cmd_out=rt/safety/lowcmd_lower_in decim=10 pub_hz=500.0
+[bridge] [bridge] warmup done (first leg cmd at t+1.36s); stepping physics now
+[orchestrator] starting ik: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.ik_dds_driver --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[ik] [ik] urdf=h1_2_handless.urdf controller_config=sim_split_controller.yaml
+[ik] StateSubscriber initialized.
+[ik] LowCmdPublisher initialized.
+[ik] All joints are locked in the initial position.
+[ik] [ik] batch mode; goals=['q_reduced[14]', 'frame_delta:right']
+[ik] [ik] goal=q_reduced[14] for 1.5s  q=[0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0.3,0. ,0. ,0. ]
+[bridge] [bridge] summary:
+[bridge]   elapsed_s=10.00
+[bridge]   low_cmd_msgs_received=4326 (first at t+0.00s)
+[bridge]   base_xyz=[0.01983436204188852, 0.03269233485332635, 0.8739935341127382]
+[bridge]   q_des[0:12]=[-0.33000001311302185, -0.29320159554481506, 0.29626160860061646, 0.9489404559135437, -0.3603871464729309, -0.16179899871349335, -0.33000001311302185, -0.18449769914150238, -0.2650168538093567, 0.8370963335037231, -0.4182513356208801, 0.16179899871349335]
+[bridge]   q_now[0:12]=[-0.3502807911418051, -0.26707455464539714, 0.3193874842451558, 1.1457907831732395, -0.5694689371656954, -0.26389512465795534, -0.331876686160008, -0.06664885317346399, -0.28993412875495556, 1.0393446735303078, -0.6756095834104002, 0.26296543679582257]
+[bridge]   q_des[13:20]=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # left arm
+[bridge]   q_now[13:20]=[0.004175233843059588, 0.0015348320174643978, 0.00039097926569942157, 0.0027383762539279523, 2.6133148911596872e-05, 0.000253411440310131, 5.484383887114783e-06]
+[bridge]   q_des[20:27]=[0.0, 0.0, 0.0, 0.30000001192092896, 0.0, 0.0, 0.0]  # right arm
+[bridge]   q_now[20:27]=[0.002769323270390731, 0.0013982157987675683, 0.00014499223124383995, 0.29645820866422196, 1.4137821052389341e-05, 0.0001860755398827482, 5.389034815005039e-06]
+[ik] [ik] goal=frame_delta:right_wrist_yaw_link  current=(+0.260,-0.121,+0.104)  delta=(+0.250,+0.000,+0.000)  target=(+0.510,-0.121,+0.104)  max=5.0s
+[ik] [ik] driving frame_task on right_wrist_yaw_link; xyz=(+0.510,-0.121,+0.104) rpy_deg=(-5.0,+1.7,+19.4) timeout=5.0s
+[ik] [ik]   linear=0.3071 m  angular=0.4138 rad
+[orchestrator] bridge exited with code 0
+[orchestrator] sending SIGINT to safety (pgid=816522)
+[orchestrator] sending SIGINT to fame (pgid=816615)
+[orchestrator] sending SIGINT to ik (pgid=817173)
+[ik] [ik] interrupted, shutting down
+[ik] StateSubscriber shutdown
+[ik] RobotModel shutdown
+[fame] [fame] interrupted, shutting down
+[ik] LowCmdPublisher shutdown.
+[safety] {"event": "relay_started", "mode": "split_mode"}
+[safety] KeyboardInterrupt received, stopping safety layer...
+[safety] {"event": "relay_stopped"}
+[orchestrator] done

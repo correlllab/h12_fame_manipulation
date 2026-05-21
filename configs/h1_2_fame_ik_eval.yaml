@@ -8,7 +8,10 @@ mujoco:
   simulation_dt: 0.002
   headless: false
   duration: 0.0
-  warmup_seconds: 6.0
+  # Was 6.0s; FAME usually publishes a leg cmd within ~1.5s so the bridge
+  # exits warmup early anyway, but a tight ceiling avoids dead time on
+  # short trials.
+  warmup_seconds: 3.0
 
 robot:
   num_h12_motors: 27
@@ -59,7 +62,13 @@ fame:
   action_scale: 0.25
   cmd_scale: [2.0, 2.0, 0.25]
   cmd_init: [0.0, 0.0, 0.0]
-  height_cmd: 0.80
+  # Bumped from 0.80 -> 0.90. Tried 0.95 and FAME goes out of policy
+  # distribution: the startup transition (XML default z=1.03 -> commanded
+  # 0.95) swings the arms forward enough to pre-push the block ~14 cm
+  # before the IK push goal even starts, contaminating the measurement.
+  # 0.90 keeps startup clean, reduces pelvis pitch -17°→-15°, and bumps
+  # the controlled push from 11 cm to 16 cm. Yaw (+21°) still uncorrected.
+  height_cmd: 0.90
   control_decimation: 10
   publish_hz: 500.0
   default_angles_legs:
@@ -111,17 +120,21 @@ ik:
   #      time to interpolate.
   #   3) home: arms back to zero
   goals:
-    - name: "home"
-      seconds: 5.0
-    # frame_delta: read the right wrist's CURRENT IK-frame pose, add
-    # delta, drive there. The IK's "+x in pelvis frame" maps to world
-    # direction (~0.41, +0.59, +0.56) because FAME holds the body at
-    # RPY(-5°, -17°, +21°). Instead of trying to compensate that in the
-    # delta, the block is positioned along this natural arc in the XML
-    # (see push_block body comment) — so a clean delta_x=0.25 drives the
-    # wrist along its native forward direction straight into the block.
+    # Pre-bias BOTH elbows in opposite directions (mirrored "arms out"
+    # ready pose). With FAME at height_cmd=0.90 and these biases the
+    # wrists come up from the natural hang to roughly block-center
+    # height, while the symmetric mirror keeps any reaction torque on
+    # the pelvis purely in pitch (no yaw moment). ENABLED_JOINTS index
+    # 3 = left_elbow, 10 = right_elbow — opposite signs since the two
+    # arms' elbow axes point in opposite world directions.
+    - q_reduced:
+        [0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0,
+         0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0]
+      seconds: 1.5
     - frame_delta: "right"
       delta: [0.25, 0.0, 0.0, 0.0, 0.0, 0.0]
-      seconds: 15.0
-    - name: "home"
-      seconds: 8.0
+      seconds: 5.0
+    # No trailing retract — IK retracting to zeros from the extended
+    # push pose has been the consistent destabilizer for FAME. Holding
+    # the final push pose till orchestrator duration runs out lets us
+    # measure the settled block displacement cleanly.

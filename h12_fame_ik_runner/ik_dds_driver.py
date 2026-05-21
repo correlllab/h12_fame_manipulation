@@ -24,6 +24,7 @@ Both modes publish to whatever ``low_cmd`` topic the controller config maps to
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 import time
 from pathlib import Path
@@ -67,6 +68,29 @@ def _make_frame_controller(runner_yaml: dict, cfg_dir: Path) -> FrameController:
     if not cfg_arg.is_absolute() and ("/" in controller_cfg_name or cfg_arg.suffix):
         cfg_arg = _resolve_path(controller_cfg_name, cfg_dir)
     controller_config = load_controller_config(str(cfg_arg))
+
+    # ARM_KP_MULT env override: scales the arm kp values FrameController
+    # will embed in every LowCmd. Indices 13..26 in BODY_JOINTS are the
+    # 7 left + 7 right arm joints; 12 is the torso. We scale 13..26 (both
+    # arms) so the PD applies more torque for the same position error —
+    # the most direct knob for "push harder when the arm is at workspace
+    # limit". Wrists scale too but they're typically already low (20).
+    mult_env = os.environ.get("ARM_KP_MULT", "").strip()
+    if mult_env:
+        try:
+            mult = float(mult_env)
+            kp = controller_config.get("gains", {}).get("kp", None)
+            if kp is not None and len(kp) >= 27:
+                old = list(kp[13:27])
+                for i in range(13, 27):
+                    kp[i] = float(kp[i]) * mult
+                new = list(kp[13:27])
+                print(f"[ik] ARM_KP_MULT={mult:.3f} : arm kp scaled\n"
+                      f"     old (13..26): {old}\n"
+                      f"     new (13..26): {new}", flush=True)
+        except ValueError:
+            print(f"[ik] ignoring invalid ARM_KP_MULT={mult_env!r}", flush=True)
+
     initialize_channel_factory(controller_config)
 
     urdf_path = _resolve_path(ik["urdf_path"], cfg_dir)
@@ -190,6 +214,18 @@ def run_batch(
                 print(f"[ik] skipping malformed frame_delta goal {goal}: {exc}",
                       flush=True)
                 continue
+            # PUSH_DELTA_X env override: lets a sweep script vary the push
+            # amplitude without rewriting YAML for each trial. Replaces the
+            # x-component of the delta only (y, z, RPY unchanged).
+            env_dx = os.environ.get("PUSH_DELTA_X", "").strip()
+            if env_dx:
+                try:
+                    old = float(delta[0])
+                    delta[0] = float(env_dx)
+                    print(f"[ik] PUSH_DELTA_X override: delta_x {old:.3f} -> {delta[0]:.3f}",
+                          flush=True)
+                except ValueError:
+                    print(f"[ik] ignoring invalid PUSH_DELTA_X={env_dx!r}", flush=True)
             try:
                 current = frame_controller.get_frame_pose(link)
             except Exception as exc:

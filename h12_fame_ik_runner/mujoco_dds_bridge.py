@@ -308,13 +308,17 @@ class MujocoDDSBridge:
         if self._block_log_fh is None:
             try:
                 self._block_log_fh = open(self._block_log_path, "w", buffering=1)
+                # leg torque columns: tau_l0..tau_l11 (12 leg actuators
+                # in BODY_JOINTS order: 6 left + 6 right hip/knee/ankle).
+                leg_tau_cols = ",".join(f"tau_l{i}" for i in range(12))
                 self._block_log_fh.write(
                     "t,block_x,block_y,block_z,base_x,base_y,base_z,"
                     "base_qw,base_qx,base_qy,base_qz,"
                     "wrist_x,wrist_y,wrist_z,"
                     "wrist_qw,wrist_qx,wrist_qy,wrist_qz,"
                     "rsp_des,rsr_des,rsy_des,rel_des,"
-                    "rsp_now,rsr_now,rsy_now,rel_now\n"
+                    "rsp_now,rsr_now,rsy_now,rel_now,"
+                    f"{leg_tau_cols}\n"
                 )
             except OSError as exc:
                 print(f"[bridge] could not open BLOCK_LOG_PATH={self._block_log_path}: {exc}",
@@ -345,13 +349,20 @@ class MujocoDDSBridge:
         rsy_n = float(self._d.qpos[self._h12_qpos_adr[22]])
         rel_n = float(self._d.qpos[self._h12_qpos_adr[23]])
         t = float(self._d.time)
+        # Leg actuator forces (12 leg joints, indices 0..11 in BODY_JOINTS).
+        # These are the torques FAME's policy is asking the legs to apply
+        # this step — direct measure of "how hard the lower body is working".
+        leg_tau = ",".join(
+            f"{float(self._d.actuator_force[i]):.3f}" for i in range(12)
+        )
         self._block_log_fh.write(
             f"{t:.4f},{bx:.5f},{by:.5f},{bz:.5f},{px:.5f},{py:.5f},{pz:.5f},"
             f"{qw:.5f},{qx:.5f},{qy:.5f},{qz:.5f},"
             f"{wx:.5f},{wy:.5f},{wz:.5f},"
             f"{wqw:.5f},{wqx:.5f},{wqy:.5f},{wqz:.5f},"
             f"{rsp_d:.4f},{rsr_d:.4f},{rsy_d:.4f},{rel_d:.4f},"
-            f"{rsp_n:.4f},{rsr_n:.4f},{rsy_n:.4f},{rel_n:.4f}\n"
+            f"{rsp_n:.4f},{rsr_n:.4f},{rsy_n:.4f},{rel_n:.4f},"
+            f"{leg_tau}\n"
         )
 
     # ------------------------------------------------------------- Entrypoint

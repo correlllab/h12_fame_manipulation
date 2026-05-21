@@ -1,0 +1,43 @@
+[orchestrator] starting safety: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python /home/niraj/isaac_gym_projects/h12_safety_layer/h12_safety_layer/script/safety_layer_main.py --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/sim_safety_split.yaml
+[orchestrator] starting bridge: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.mujoco_dds_bridge --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml --headless --duration 10.0
+[bridge] [bridge] PUSH_BLOCK_MASS override: 0.5000 -> 5.0000 kg (inertia x10.000)
+[bridge] [bridge] scene=h1_2_table.xml headless=True low_state=rt/lowstate low_cmd_in=rt/lowcmd
+[bridge] [bridge] warmup: holding sim frozen up to 3.00s or until first FAME leg cmd lands
+[orchestrator] starting fame: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.fame_dds_runner --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[fame] [fame] loaded encoder /home/niraj/isaac_gym_projects/h12_fame_manipulation/h12_fame_ik_runner/ckpts/handless/encoder_3999.pt
+[fame] [fame] low_state=rt/lowstate low_cmd_out=rt/safety/lowcmd_lower_in decim=10 pub_hz=500.0
+[bridge] [bridge] warmup done (first leg cmd at t+1.39s); stepping physics now
+[orchestrator] starting ik: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.ik_dds_driver --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[ik] [ik] urdf=h1_2_handless.urdf controller_config=sim_split_controller.yaml
+[ik] StateSubscriber initialized.
+[ik] LowCmdPublisher initialized.
+[ik] All joints are locked in the initial position.
+[ik] [ik] batch mode; goals=['q_reduced[14]', 'frame_delta:right']
+[ik] [ik] goal=q_reduced[14] for 1.5s  q=[0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0.3,0. ,0. ,0. ]
+[bridge] [bridge] summary:
+[bridge]   elapsed_s=10.00
+[bridge]   low_cmd_msgs_received=4384 (first at t+0.00s)
+[bridge]   base_xyz=[0.019395763829352913, 0.034795167335563155, 0.8732819793511812]
+[bridge]   q_des[0:12]=[-0.33000001311302185, -0.30344605445861816, 0.30705884099006653, 0.9499048590660095, -0.3590919077396393, -0.16179899871349335, -0.33000001311302185, -0.1840498298406601, -0.27762821316719055, 0.846103310585022, -0.41345036029815674, 0.16179899871349335]
+[bridge]   q_now[0:12]=[-0.3468886326177399, -0.26999241493693166, 0.31398406796487954, 1.1553807438254526, -0.5790477294676812, -0.2639659132045567, -0.33477732980328434, -0.07308371383713995, -0.2897478867972805, 1.0444327787353804, -0.675170338750603, 0.262950361829918]
+[bridge]   q_des[13:20]=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # left arm
+[bridge]   q_now[13:20]=[0.003746352919619585, 0.001581825919341037, 0.00040235198828088937, 0.0027208261451600216, 2.6685286757159443e-05, 0.0002598096041747899, 5.39664905434241e-06]
+[bridge]   q_des[20:27]=[0.0, 0.0, 0.0, 0.30000001192092896, -0.0, 0.0, 0.0]  # right arm
+[bridge]   q_now[20:27]=[0.0031986599826457785, 0.00498272291313113, 0.0021661200252874498, 0.29577882561261476, -0.00013084801050840654, -0.0007022402639227735, 5.060052363399606e-06]
+[ik] [ik] PUSH_DELTA_X override: delta_x 0.250 -> 0.250
+[ik] [ik] goal=frame_delta:right_wrist_yaw_link  current=(+0.258,-0.121,+0.103)  delta=(+0.250,+0.000,+0.000)  target=(+0.508,-0.121,+0.103)  max=5.0s
+[ik] [ik] driving frame_task on right_wrist_yaw_link; xyz=(+0.508,-0.121,+0.103) rpy_deg=(-4.9,+1.8,+19.0) timeout=5.0s
+[ik] [ik]   linear=0.3048 m  angular=0.4059 rad
+[orchestrator] bridge exited with code 0
+[orchestrator] sending SIGINT to safety (pgid=920358)
+[orchestrator] sending SIGINT to fame (pgid=920451)
+[orchestrator] sending SIGINT to ik (pgid=920987)
+[ik] [ik] interrupted, shutting down
+[ik] StateSubscriber shutdown
+[ik] RobotModel shutdown
+[fame] [fame] interrupted, shutting down
+[ik] LowCmdPublisher shutdown.
+[safety] {"event": "relay_started", "mode": "split_mode"}
+[safety] KeyboardInterrupt received, stopping safety layer...
+[safety] {"event": "relay_stopped"}
+[orchestrator] done

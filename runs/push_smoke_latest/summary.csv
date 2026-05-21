@@ -1,2 +1,0 @@
-mass_kg,trial_idx,rc,wall_seconds,success,reason,block_x0,block_xN,block_x_max,block_z_min,pelvis_z0,pelvis_zN,pelvis_z_min,csv
-0.5,0,0,41.810508489608765,0,robot fell (min pelvis z=0.072 < 0.650),0.61,0.61,0.61,1.05609,1.02996,0.07272,0.07199,runs/push_smoke11/trial_m0.500kg_t00.csv

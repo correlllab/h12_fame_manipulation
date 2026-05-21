@@ -1,0 +1,42 @@
+[orchestrator] starting safety: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python /home/niraj/isaac_gym_projects/h12_safety_layer/h12_safety_layer/script/safety_layer_main.py --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/sim_safety_split.yaml
+[orchestrator] starting bridge: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.mujoco_dds_bridge --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml --headless --duration 10.0
+[bridge] [bridge] PUSH_BLOCK_MASS override: 0.5000 -> 5.0000 kg (inertia x10.000)
+[bridge] [bridge] scene=h1_2_table.xml headless=True low_state=rt/lowstate low_cmd_in=rt/lowcmd
+[bridge] [bridge] warmup: holding sim frozen up to 3.00s or until first FAME leg cmd lands
+[orchestrator] starting fame: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.fame_dds_runner --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[fame] [fame] loaded encoder /home/niraj/isaac_gym_projects/h12_fame_manipulation/h12_fame_ik_runner/ckpts/handless/encoder_3999.pt
+[fame] [fame] low_state=rt/lowstate low_cmd_out=rt/safety/lowcmd_lower_in decim=10 pub_hz=500.0
+[bridge] [bridge] warmup done (first leg cmd at t+1.40s); stepping physics now
+[orchestrator] starting ik: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.ik_dds_driver --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[ik] [ik] ARM_KP_MULT=8.000 : arm kp scaled
+[ik]      old (13..26): [np.float32(50.0), np.float32(50.0), np.float32(50.0), np.float32(50.0), np.float32(20.0), np.float32(20.0), np.float32(20.0), np.float32(50.0), np.float32(50.0), np.float32(50.0), np.float32(50.0), np.float32(20.0), np.float32(20.0), np.float32(20.0)]
+[ik]      new (13..26): [np.float32(400.0), np.float32(400.0), np.float32(400.0), np.float32(400.0), np.float32(160.0), np.float32(160.0), np.float32(160.0), np.float32(400.0), np.float32(400.0), np.float32(400.0), np.float32(400.0), np.float32(160.0), np.float32(160.0), np.float32(160.0)]
+[ik] [ik] urdf=h1_2_handless.urdf controller_config=sim_split_controller.yaml
+[ik] StateSubscriber initialized.
+[ik] LowCmdPublisher initialized.
+[ik] All joints are locked in the initial position.
+[ik] [ik] batch mode; goals=['q_reduced[14]', 'frame_delta:right']
+[ik] [ik] goal=q_reduced[14] for 1.5s  q=[0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0.3,0. ,0. ,0. ]
+[bridge] [bridge] summary:
+[bridge]   elapsed_s=10.00
+[bridge]   low_cmd_msgs_received=4416 (first at t+0.00s)
+[bridge]   base_xyz=[0.01141270197195937, 0.035062058438890396, 0.8728249660630488]
+[bridge]   q_des[0:12]=[-0.33000001311302185, -0.2877468168735504, 0.29145053029060364, 0.9422014951705933, -0.45888131856918335, -0.16179899871349335, -0.33000001311302185, -0.17642255127429962, -0.25678279995918274, 0.8281639814376831, -0.5035838484764099, 0.16179899871349335]
+[bridge]   q_now[0:12]=[-0.3483592485417677, -0.2479093748312403, 0.31409373734721346, 1.1590232281386967, -0.5788311431496977, -0.2639487054983906, -0.3320168706866106, -0.0509032717988832, -0.2852705872161136, 1.0389891646367866, -0.6653716183783426, 0.26298415748618614]
+[bridge]   q_des[13:20]=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # left arm
+[bridge]   q_now[13:20]=[0.00012991887845859845, -0.00014144788427007007, -7.978107416025532e-05, -0.00013510589652674832, 1.3568732974652993e-05, 0.000131922272936331, 2.7551117582948096e-06]
+[bridge]   q_des[20:27]=[0.0, 0.0, 0.0, 0.2657177150249481, 0.0, 0.0, 0.0]  # right arm
+[bridge]   q_now[20:27]=[0.0004256608958382778, -0.0001389448293630331, -8.026066886698985e-05, 0.26102162084640207, -0.00021485555396822837, -0.0005928927220772728, 2.8283265649984777e-06]
+[orchestrator] bridge exited with code 0
+[orchestrator] sending SIGINT to safety (pgid=1007069)
+[orchestrator] sending SIGINT to fame (pgid=1007162)
+[orchestrator] sending SIGINT to ik (pgid=1007699)
+[ik] [ik] interrupted, shutting down
+[ik] StateSubscriber shutdown
+[ik] RobotModel shutdown
+[ik] LowCmdPublisher shutdown.
+[fame] [fame] interrupted, shutting down
+[safety] {"event": "relay_started", "mode": "split_mode"}
+[safety] KeyboardInterrupt received, stopping safety layer...
+[safety] {"event": "relay_stopped"}
+[orchestrator] done

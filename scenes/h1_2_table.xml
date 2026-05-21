@@ -54,23 +54,22 @@
             pos="-0.34465 -0.881225 0.438475" material="table_leg"/>
     </body>
 
-    <!-- Pushable block — 30 cm CUBE (wide footprint, tall enough to
-         intercept the wrist's natural arc). Not a pillar (12×12×30 was
-         too narrow); not a flat slab (30×30×14 had its top 10 cm below
-         the wrist arc peak). A 30 cm cube has the wide x/y catch-area
-         AND a top at z=1.217 — well above the wrist arc peak (z≈1.16):
-            wrist home (world)   ≈ (0.27, -0.11, 0.98)
-            block center (world)   (0.45, -0.05, 1.067)
-            block x-range          [0.30, 0.60]   back face 3 cm forward of wrist
-            block y-range          [-0.20, +0.10]   wrist y=-0.11 inside
-            block z-range          [0.917, 1.217]   sits on table; spans wrist arc
-         Mass overridden at reset by PUSH_BLOCK_MASS env var. Default 0.5 kg
-         over the 0.027 m³ volume = density 18.5 kg/m³ (like cork / hollow
-         plastic crate). -->
-    <body name="push_block" pos="0.45 -0.05 1.067">
+    <!-- Pushable block — 30 cm CUBE rotated 45° about z-axis so its
+         back face is roughly perpendicular to the right wrist's
+         incoming approach direction. Measured wrist xy approach in
+         world = +42° from +x axis (FAME yaw +21° + arm-extension
+         lateral component), so a 45° z-rotation aligns the cube face
+         normal to ~-wrist direction → wrist hits the face squarely
+         instead of glancing off a corner.
+         Block center shifted forward to x=0.52 so the rotated back
+         corner (which sticks out 0.212 m from center) lands at
+         x=0.32, just on the table top (near edge x=0.30).
+         quat = (cos(22.5°), 0, 0, sin(22.5°)) = (0.924, 0, 0, 0.383)
+         Mass overridden at reset by PUSH_BLOCK_MASS env var. -->
+    <body name="push_block" pos="0.52 -0.10 0.992" quat="0.924 0 0 0.383">
       <freejoint name="push_block_free"/>
       <geom name="push_block_geom" type="box"
-            size="0.15 0.15 0.15"
+            size="0.15 0.15 0.075"
             mass="0.5"
             material="push_block"
             friction="1.0 0.005 0.0001"/>

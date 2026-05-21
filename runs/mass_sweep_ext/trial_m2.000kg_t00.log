@@ -1,0 +1,39 @@
+[orchestrator] starting safety: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python /home/niraj/isaac_gym_projects/h12_safety_layer/h12_safety_layer/script/safety_layer_main.py --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/sim_safety_split.yaml
+[orchestrator] starting bridge: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.mujoco_dds_bridge --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml --headless --duration 10.0
+[bridge] [bridge] PUSH_BLOCK_MASS override: 0.5000 -> 2.0000 kg (inertia x4.000)
+[bridge] [bridge] scene=h1_2_table.xml headless=True low_state=rt/lowstate low_cmd_in=rt/lowcmd
+[bridge] [bridge] warmup: holding sim frozen up to 3.00s or until first FAME leg cmd lands
+[orchestrator] starting fame: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.fame_dds_runner --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[fame] [fame] loaded encoder /home/niraj/isaac_gym_projects/h12_fame_manipulation/h12_fame_ik_runner/ckpts/handless/encoder_3999.pt
+[fame] [fame] low_state=rt/lowstate low_cmd_out=rt/safety/lowcmd_lower_in decim=10 pub_hz=500.0
+[bridge] [bridge] warmup done (first leg cmd at t+1.43s); stepping physics now
+[orchestrator] starting ik: /home/niraj/isaac_gym_projects/h12_adaptive_policy/.venv/bin/python -m h12_fame_ik_runner.ik_dds_driver --config /home/niraj/isaac_gym_projects/h12_fame_manipulation/configs/h1_2_fame_ik_eval.yaml
+[ik] [ik] urdf=h1_2_handless.urdf controller_config=sim_split_controller.yaml
+[ik] StateSubscriber initialized.
+[ik] LowCmdPublisher initialized.
+[ik] All joints are locked in the initial position.
+[ik] [ik] batch mode; goals=['q_reduced[14]', 'frame_delta:right']
+[ik] [ik] goal=q_reduced[14] for 1.5s  q=[0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0. ,0.3,0. ,0. ,0. ]
+[bridge] [bridge] summary:
+[bridge]   elapsed_s=10.00
+[bridge]   low_cmd_msgs_received=4431 (first at t+0.00s)
+[bridge]   base_xyz=[0.02122286234198833, 0.037989658811097754, 0.8738462089421943]
+[bridge]   q_des[0:12]=[-0.33000001311302185, -0.2992466688156128, 0.3119574189186096, 0.9497701525688171, -0.3730946183204651, -0.16179899871349335, -0.33000001311302185, -0.1844794899225235, -0.27784299850463867, 0.8435899019241333, -0.42738574743270874, 0.16179899871349335]
+[bridge]   q_now[0:12]=[-0.3435079572931121, -0.27224824415295207, 0.3159083786934624, 1.1557580937869372, -0.5754373825031791, -0.2639882069264991, -0.33737281682088094, -0.07543196482610734, -0.288467615782728, 1.0425775535553956, -0.6689350691602485, 0.2629074093537397]
+[bridge]   q_des[13:20]=[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]  # left arm
+[bridge]   q_now[13:20]=[0.006545418944352985, 0.002926824980901024, 0.0005949188323544422, 0.0034405714441504962, 3.5620231561168116e-05, 0.0003469130363922448, 7.044043603891792e-06]
+[bridge]   q_des[20:27]=[0.0, 0.0, -0.0, 0.22603772580623627, -0.0, 0.0, 0.0]  # right arm
+[bridge]   q_now[20:27]=[0.006598300249478796, 0.003596394740615293, 0.0012945535555443529, 0.17780185725359737, -4.911482667549358e-05, -0.0010616955779234158, 6.896598460650081e-06]
+[orchestrator] bridge exited with code 0
+[orchestrator] sending SIGINT to safety (pgid=843456)
+[orchestrator] sending SIGINT to fame (pgid=843549)
+[orchestrator] sending SIGINT to ik (pgid=844075)
+[ik] [ik] interrupted, shutting down
+[ik] StateSubscriber shutdown
+[ik] RobotModel shutdown
+[fame] [fame] interrupted, shutting down
+[ik] LowCmdPublisher shutdown.
+[safety] {"event": "relay_started", "mode": "split_mode"}
+[safety] KeyboardInterrupt received, stopping safety layer...
+[safety] {"event": "relay_stopped"}
+[orchestrator] done
