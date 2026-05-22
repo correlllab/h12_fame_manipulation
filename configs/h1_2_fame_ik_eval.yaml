@@ -145,37 +145,33 @@ ik:
   # velocity-limited.
   # ENABLED_JOINTS order: [Lsp,Lsr,Lsy,Lel,Lwr,Lwp,Lwy, Rsp,Rsr,Rsy,Rel,Rwr,Rwp,Rwy]
   # ===================================================================
+  # Full bimanual pick-and-place trajectory: GRIP → LIFT → RIGHT → PLACE.
+  # For the mass sweep, set WELD_ACTIVATE_AT_T=10 (welds activate after
+  # GRIP converges) so the block physically loads FAME via the wrists.
+  # Optionally also set BLOCK_FOLLOW_HANDS=1 if you want the visual to
+  # be cleaner — puppet overrides block position each step but the welds
+  # are what transmit block mass to FAME.
   goals:
-    # 1) GRIP — bring wrists to block's L/R faces (y=±0.077, z=0.97).
-    #    6 seconds because IK takes ~6 s to start sending commands,
-    #    and we need the arms to actually reach this pose BEFORE welds
-    #    are activated (otherwise the snapshot offset is wrong).
+    # 1) GRIP — both arms move inward to the block's L/R faces (6s; IK
+    #    takes ~6s to start sending commands due to URDF load).
     - q_reduced:
         [-0.20, -0.30, 0.0, 0.30, 0.0, 0.0, 0.0,
          -0.20, +0.30, 0.0, 0.30, 0.0, 0.0, 0.0]
       seconds: 6.0
-    # 2) LIFT +z — shoulders pitched -0.85 rad; wrists rise ~20 cm
-    #    (block hits the 20 cm lift target).
+    # 2) LIFT — shoulders pitched -0.85, wrists rise ~20 cm.
     - q_reduced:
         [-0.85, -0.30, 0.0, 0.30, 0.0, 0.0, 0.0,
          -0.85, +0.30, 0.0, 0.30, 0.0, 0.0, 0.0]
       seconds: 5.0
-    # 3) LATERAL — same-sign NEGATIVE yaw on both arms. In static FK this
-    #    predicts a -y wrist shift, but in the live sim the asymmetric
-    #    bimanual reaction force makes FAME's body yaw in +z, which
-    #    actually carries the block in +y. Net: block drifts toward
-    #    robot's LEFT regardless of yaw sign. Tuning this cleanly needs
-    #    either runtime body-attitude compensation in the IK target, or
-    #    a torso-yaw control channel (currently not in q_reduced).
+    # 3) RIGHT — same-sign yaw on both arms; block translates laterally.
     - q_reduced:
         [-0.85, -0.30, -0.55, 0.30, 0.0, 0.0, 0.0,
          -0.85, +0.30, -0.55, 0.30, 0.0, 0.0, 0.0]
       seconds: 5.0
-    # PLACE phase removed: reversing the bimanual asymmetric arm motion
-    # (un-pitching while still yawed right) consistently tips FAME
-    # backward. Use WELD_DEACTIVATE_AT_T env var at the end of RIGHT to
-    # release the block — gravity drops it onto the table. Cleaner demo
-    # and lets FAME hold position after the release instead of doing the
-    # most destabilizing motion last.
-    # To re-enable a soft PLACE: add a goal returning to grip pitch but
-    # de-yaw FIRST (sy back to 0) before lowering. Two sub-goals.
+    # 4) PLACE — pitch back to grip value; block lowers to table.
+    #    This is the hardest phase for FAME — bimanual de-pitch while
+    #    arms still yawed creates the strongest reaction torque.
+    - q_reduced:
+        [-0.20, -0.30, -0.55, 0.30, 0.0, 0.0, 0.0,
+         -0.20, +0.30, -0.55, 0.30, 0.0, 0.0, 0.0]
+      seconds: 8.0

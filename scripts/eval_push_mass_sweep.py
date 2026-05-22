@@ -191,6 +191,13 @@ def _run_trial(mass: float, trial_idx: int, args, csv_path: Path) -> dict:
         env["PUSH_DELTA_X"] = f"{args.delta_x:.6f}"
     if args.arm_kp_mult is not None:
         env["ARM_KP_MULT"] = f"{args.arm_kp_mult:.6f}"
+    if args.weld_activate_at_t is not None:
+        env["WELD_ACTIVATE_AT_T"] = f"{args.weld_activate_at_t:.6f}"
+    if args.weld_deactivate_at_t is not None:
+        env["WELD_DEACTIVATE_AT_T"] = f"{args.weld_deactivate_at_t:.6f}"
+    if args.block_follow_hands:
+        env["BLOCK_FOLLOW_HANDS"] = "1"
+        env["BLOCK_FOLLOW_AFTER"] = f"{args.block_follow_after:.6f}"
     cmd = [
         _python(), "-u", "-m", "h12_fame_ik_runner.orchestrator",
         "--config", str(args.config),
@@ -275,6 +282,20 @@ def main() -> None:
                              "13..26 in BODY_JOINTS) by this multiplier. e.g. "
                              "2.0 = double the arm PD stiffness, pushes harder "
                              "for the same position error. Passed via env var.")
+    parser.add_argument("--weld-activate-at-t", type=float, default=None,
+                        help="Activate block↔wrist welds at this sim time. "
+                             "Use for bimanual pick-and-place where the block "
+                             "must physically load FAME (mass matters).")
+    parser.add_argument("--weld-deactivate-at-t", type=float, default=None,
+                        help="Deactivate welds at this sim time. Use to "
+                             "release the block at the end of a trajectory.")
+    parser.add_argument("--block-follow-hands", action="store_true",
+                        help="Kinematically puppet the block to the midpoint "
+                             "of the two wrists each step. Cleaner visual but "
+                             "doesn't load FAME with block mass (use welds "
+                             "for mass-dependent dynamics).")
+    parser.add_argument("--block-follow-after", type=float, default=2.0,
+                        help="Sim time after which puppet kicks in (s).")
     parser.add_argument("--target-x", type=float, default=0.55,
                         help="Block-x success threshold (world m); block "
                              "starts at world x=0.52 (post-settling ≈0.53), "

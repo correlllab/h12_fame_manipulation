@@ -185,6 +185,18 @@ class MujocoDDSBridge:
             self._weld_deactivate_at_t = 0.0
         self._welds_activated = False
         self._welds_deactivated = False
+
+        # Kinematic puppet: BLOCK_FOLLOW_HANDS=1 makes the bridge override
+        # the block's qpos every sim step with the midpoint of the two
+        # wrists. Block visually sticks to the hands without any weld
+        # gymnastics. Tradeoff: FAME doesn't feel the block's mass since
+        # we cheat the block position via direct state write; use only
+        # for visualization, not for disturbance metrics.
+        self._block_follow_hands = bool(int(os.environ.get("BLOCK_FOLLOW_HANDS", "0") or "0"))
+        try:
+            self._block_follow_after = float(os.environ.get("BLOCK_FOLLOW_AFTER", "0") or "0")
+        except ValueError:
+            self._block_follow_after = 0.0
         self._right_weld_eq_id = mujoco.mj_name2id(self._m, mujoco.mjtObj.mjOBJ_EQUALITY, "weld_block_right")
         self._left_weld_eq_id  = mujoco.mj_name2id(self._m, mujoco.mjtObj.mjOBJ_EQUALITY, "weld_block_left")
         self._left_wrist_body_id = mujoco.mj_name2id(self._m, mujoco.mjtObj.mjOBJ_BODY, "left_wrist_yaw_link")
@@ -343,9 +355,34 @@ class MujocoDDSBridge:
         self._maybe_spawn_block_at_hand()
         self._maybe_activate_welds()
         self._maybe_deactivate_welds()
+        self._maybe_puppet_block_to_hands()
         if self._step_counter % self._state_pub_decim == 0:
             self._fill_and_publish_low_state()
             self._log_block_pose()
+
+    def _maybe_puppet_block_to_hands(self) -> None:
+        """If BLOCK_FOLLOW_HANDS=1, override block qpos to be the midpoint
+        of the two wrists' world positions each step. Pure kinematic — no
+        physics on the block. Use for clean visual demos."""
+        if not self._block_follow_hands:
+            return
+        if self._block_qpos_adr < 0:
+            return
+        if self._right_wrist_body_id < 0 or self._left_wrist_body_id < 0:
+            return
+        if float(self._d.time) < self._block_follow_after:
+            return
+        wr = self._d.xpos[self._right_wrist_body_id]
+        wl = self._d.xpos[self._left_wrist_body_id]
+        a = self._block_qpos_adr
+        self._d.qpos[a + 0] = 0.5 * (float(wr[0]) + float(wl[0]))
+        self._d.qpos[a + 1] = 0.5 * (float(wr[1]) + float(wl[1]))
+        self._d.qpos[a + 2] = 0.5 * (float(wr[2]) + float(wl[2]))
+        # Zero the freejoint velocity so the block doesn't accumulate
+        # drift from previous steps (we're cheating physics anyway).
+        if hasattr(self, "_block_qvel_adr"):
+            v = self._block_qvel_adr
+            self._d.qvel[v: v + 6] = 0.0
 
     def _maybe_deactivate_welds(self) -> None:
         if self._welds_deactivated:
