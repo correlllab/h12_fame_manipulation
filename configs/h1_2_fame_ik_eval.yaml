@@ -119,22 +119,63 @@ ik:
   #      the table-top slab during the sweep. 15s budget so the IK has
   #      time to interpolate.
   #   3) home: arms back to zero
+  # ===================================================================
+  # Bimanual pick-and-place sequence.
+  # Joint angles found by FK grid-search against FAME's crouched pose at
+  # height_cmd=0.90. ENABLED_JOINTS order:
+  #   [Lsp,Lsr,Lsy,Lel,Lwr,Lwp,Lwy,  Rsp,Rsr,Rsy,Rel,Rwr,Rwp,Rwy]
+  # Mirror convention for symmetric "arms inward" motion:
+  #   left  shoulder_roll = -0.30  (NEG roll on left  = wrist toward midline)
+  #   right shoulder_roll = +0.30  (POS roll on right = wrist toward midline)
+  #
+  # Timing (sim_t starts at end of bridge warmup):
+  #   0  – 4 s : GRIP   both wrists at the block's L/R faces, z=0.98
+  #   ~3 s     : bridge activates block<->wrist welds via WELD_ACTIVATE_AT_T=3.0
+  #   4  – 7 s : LIFT   shoulder pitched more forward, wrists rise ~10cm
+  #   7  – 10s : PLACE  back to grip pose, block lowers to table
+  # ===================================================================
+  # ===================================================================
+  # Bimanual pick-and-place sequence: GRIP -> LIFT -> RIGHT -> PLACE.
+  # Joint angles found by FK grid-search against FAME's crouched pose
+  # at height_cmd=0.90, with 15 cm wide block (half_y=0.075). The four
+  # poses use mirrored shoulder_roll (left=-0.30, right=+0.30, both
+  # inward) and SAME-SIGN shoulder_yaw on both arms — opposite-sign
+  # yaw makes arms swing across each other rather than translate.
+  # Each goal step takes ~3-4s because goto_reduced_configuration is
+  # velocity-limited.
+  # ENABLED_JOINTS order: [Lsp,Lsr,Lsy,Lel,Lwr,Lwp,Lwy, Rsp,Rsr,Rsy,Rel,Rwr,Rwp,Rwy]
+  # ===================================================================
   goals:
-    # Pre-bias BOTH elbows in opposite directions (mirrored "arms out"
-    # ready pose). With FAME at height_cmd=0.90 and these biases the
-    # wrists come up from the natural hang to roughly block-center
-    # height, while the symmetric mirror keeps any reaction torque on
-    # the pelvis purely in pitch (no yaw moment). ENABLED_JOINTS index
-    # 3 = left_elbow, 10 = right_elbow — opposite signs since the two
-    # arms' elbow axes point in opposite world directions.
+    # 1) GRIP — bring wrists to block's L/R faces (y=±0.077, z=0.97).
+    #    6 seconds because IK takes ~6 s to start sending commands,
+    #    and we need the arms to actually reach this pose BEFORE welds
+    #    are activated (otherwise the snapshot offset is wrong).
     - q_reduced:
-        [0.0, 0.0, 0.0,  0.0, 0.0, 0.0, 0.0,
-         0.0, 0.0, 0.0, 0.3, 0.0, 0.0, 0.0]
-      seconds: 1.5
-    - frame_delta: "right"
-      delta: [0.25, 0.0, 0.0, 0.0, 0.0, 0.0]
+        [-0.20, -0.30, 0.0, 0.30, 0.0, 0.0, 0.0,
+         -0.20, +0.30, 0.0, 0.30, 0.0, 0.0, 0.0]
+      seconds: 6.0
+    # 2) LIFT +z — shoulders pitched -0.85 rad; wrists rise ~20 cm
+    #    (block hits the 20 cm lift target).
+    - q_reduced:
+        [-0.85, -0.30, 0.0, 0.30, 0.0, 0.0, 0.0,
+         -0.85, +0.30, 0.0, 0.30, 0.0, 0.0, 0.0]
       seconds: 5.0
-    # No trailing retract — IK retracting to zeros from the extended
-    # push pose has been the consistent destabilizer for FAME. Holding
-    # the final push pose till orchestrator duration runs out lets us
-    # measure the settled block displacement cleanly.
+    # 3) LATERAL — same-sign NEGATIVE yaw on both arms. In static FK this
+    #    predicts a -y wrist shift, but in the live sim the asymmetric
+    #    bimanual reaction force makes FAME's body yaw in +z, which
+    #    actually carries the block in +y. Net: block drifts toward
+    #    robot's LEFT regardless of yaw sign. Tuning this cleanly needs
+    #    either runtime body-attitude compensation in the IK target, or
+    #    a torso-yaw control channel (currently not in q_reduced).
+    - q_reduced:
+        [-0.85, -0.30, -0.55, 0.30, 0.0, 0.0, 0.0,
+         -0.85, +0.30, -0.55, 0.30, 0.0, 0.0, 0.0]
+      seconds: 5.0
+    # PLACE phase removed: reversing the bimanual asymmetric arm motion
+    # (un-pitching while still yawed right) consistently tips FAME
+    # backward. Use WELD_DEACTIVATE_AT_T env var at the end of RIGHT to
+    # release the block — gravity drops it onto the table. Cleaner demo
+    # and lets FAME hold position after the release instead of doing the
+    # most destabilizing motion last.
+    # To re-enable a soft PLACE: add a goal returning to grip pitch but
+    # de-yaw FIRST (sy back to 0) before lowering. Two sub-goals.

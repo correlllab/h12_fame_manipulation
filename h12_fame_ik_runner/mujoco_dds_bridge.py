@@ -144,8 +144,50 @@ class MujocoDDSBridge:
                 )
                 if jid >= 0:
                     self._block_qpos_adr = int(self._m.jnt_qposadr[jid])
+                    self._block_qvel_adr = int(self._m.jnt_dofadr[jid])
             except Exception:
                 pass
+
+        # Spawn-at-hand: park the block in the XML wherever, then once FAME
+        # has settled (~SPAWN_BLOCK_AFTER seconds after warmup ends), teleport
+        # it via direct qpos writes to (wrist_world + SPAWN_BLOCK_OFFSET).
+        # The block's quat from the XML is preserved (no rotation change).
+        self._spawn_block = bool(int(os.environ.get("SPAWN_BLOCK_AT_HAND", "0") or "0"))
+        try:
+            self._spawn_block_after = float(os.environ.get("SPAWN_BLOCK_AFTER", "1.0"))
+        except ValueError:
+            self._spawn_block_after = 1.0
+        offset_env = os.environ.get("SPAWN_BLOCK_OFFSET", "0.10,0.0,0.0").strip()
+        try:
+            self._spawn_block_offset = [float(v) for v in offset_env.split(",")]
+            if len(self._spawn_block_offset) != 3:
+                raise ValueError
+        except ValueError:
+            print(f"[bridge] bad SPAWN_BLOCK_OFFSET={offset_env!r}; defaulting to (0.10, 0, 0)",
+                  flush=True)
+            self._spawn_block_offset = [0.10, 0.0, 0.0]
+        self._spawned_block = False  # latched true once teleport is done
+        self._spawn_block_at_sim_t = None  # set when warmup ends
+
+        # Bimanual weld activation: WELD_ACTIVATE_AT_T = absolute sim time
+        # (seconds) at which to enable the two block↔wrist welds defined in
+        # the scene XML. At activation we snapshot the CURRENT relative
+        # pose of each wrist in the block's frame and write it into
+        # data.eq_data so the welds pin the bodies at that exact offset
+        # going forward. <=0 or unset = welds never activated.
+        try:
+            self._weld_activate_at_t = float(os.environ.get("WELD_ACTIVATE_AT_T", "0") or "0")
+        except ValueError:
+            self._weld_activate_at_t = 0.0
+        try:
+            self._weld_deactivate_at_t = float(os.environ.get("WELD_DEACTIVATE_AT_T", "0") or "0")
+        except ValueError:
+            self._weld_deactivate_at_t = 0.0
+        self._welds_activated = False
+        self._welds_deactivated = False
+        self._right_weld_eq_id = mujoco.mj_name2id(self._m, mujoco.mjtObj.mjOBJ_EQUALITY, "weld_block_right")
+        self._left_weld_eq_id  = mujoco.mj_name2id(self._m, mujoco.mjtObj.mjOBJ_EQUALITY, "weld_block_left")
+        self._left_wrist_body_id = mujoco.mj_name2id(self._m, mujoco.mjtObj.mjOBJ_BODY, "left_wrist_yaw_link")
 
         # First 27 actuators correspond to BODY_JOINTS / JOINT_NAMES (verified
         # against h1_2.xml/scene.xml at runner-creation time).
@@ -298,9 +340,118 @@ class MujocoDDSBridge:
         self._apply_pd_to_ctrl()
         mujoco.mj_step(self._m, self._d)
         self._step_counter += 1
+        self._maybe_spawn_block_at_hand()
+        self._maybe_activate_welds()
+        self._maybe_deactivate_welds()
         if self._step_counter % self._state_pub_decim == 0:
             self._fill_and_publish_low_state()
             self._log_block_pose()
+
+    def _maybe_deactivate_welds(self) -> None:
+        if self._welds_deactivated:
+            return
+        if self._weld_deactivate_at_t <= 0.0:
+            return
+        if not self._welds_activated:
+            return
+        if float(self._d.time) < self._weld_deactivate_at_t:
+            return
+        for eq_id in (self._right_weld_eq_id, self._left_weld_eq_id):
+            if eq_id >= 0:
+                self._d.eq_active[eq_id] = 0
+        print(f"[bridge] welds deactivated at t={float(self._d.time):.3f}s — "
+              f"block is now free", flush=True)
+        self._welds_deactivated = True
+
+    def _maybe_activate_welds(self) -> None:
+        """If WELD_ACTIVATE_AT_T was set and we've reached that sim time,
+        snapshot block↔wrist relative pose for each weld, write to
+        data.eq_data, and set eq_active=1. Idempotent (latches once)."""
+        if self._welds_activated:
+            return
+        if self._weld_activate_at_t <= 0.0:
+            return
+        if float(self._d.time) < self._weld_activate_at_t:
+            return
+        if self._right_weld_eq_id < 0 and self._left_weld_eq_id < 0:
+            self._welds_activated = True
+            return
+
+        # Block pose in world (from xpos/xquat — already up to date after mj_step)
+        block_bid = mujoco.mj_name2id(self._m, mujoco.mjtObj.mjOBJ_BODY, "push_block")
+        if block_bid < 0:
+            self._welds_activated = True
+            return
+        b_pos = self._d.xpos[block_bid].copy()
+        b_quat = self._d.xquat[block_bid].copy()
+        # Inverse block quat (conjugate for unit quats)
+        b_quat_inv = np.array([b_quat[0], -b_quat[1], -b_quat[2], -b_quat[3]])
+
+        def snapshot(eq_id: int, wrist_bid: int) -> tuple[np.ndarray, np.ndarray]:
+            w_pos = self._d.xpos[wrist_bid]
+            w_quat = self._d.xquat[wrist_bid]
+            # Rel pos: rotate (w_pos - b_pos) by b_quat_inv
+            dp = np.array(w_pos - b_pos, dtype=np.float64)
+            rel_pos = _quat_rotate(b_quat_inv, dp)
+            # Rel quat: b_quat_inv * w_quat
+            rel_quat = _quat_mul(b_quat_inv, np.array(w_quat, dtype=np.float64))
+            return rel_pos, rel_quat
+
+        if self._right_weld_eq_id >= 0 and self._right_wrist_body_id >= 0:
+            rp, rq = snapshot(self._right_weld_eq_id, self._right_wrist_body_id)
+            self._m.eq_data[self._right_weld_eq_id, 3:6] = rp
+            self._m.eq_data[self._right_weld_eq_id, 6:10] = rq
+            self._d.eq_active[self._right_weld_eq_id] = 1
+            print(f"[bridge] weld_block_right activated at t={float(self._d.time):.3f}s  "
+                  f"relpos={rp.round(3).tolist()}  relquat={rq.round(3).tolist()}",
+                  flush=True)
+        if self._left_weld_eq_id >= 0 and self._left_wrist_body_id >= 0:
+            rp, rq = snapshot(self._left_weld_eq_id, self._left_wrist_body_id)
+            self._m.eq_data[self._left_weld_eq_id, 3:6] = rp
+            self._m.eq_data[self._left_weld_eq_id, 6:10] = rq
+            self._d.eq_active[self._left_weld_eq_id] = 1
+            print(f"[bridge] weld_block_left activated at t={float(self._d.time):.3f}s  "
+                  f"relpos={rp.round(3).tolist()}  relquat={rq.round(3).tolist()}",
+                  flush=True)
+        mujoco.mj_forward(self._m, self._d)
+        self._welds_activated = True
+
+    def _maybe_spawn_block_at_hand(self) -> None:
+        """If SPAWN_BLOCK_AT_HAND=1, teleport the block to the right wrist's
+        current world position + offset, once after warmup + a settle delay.
+        Done by direct qpos write — MuJoCo can't add bodies post-compile, but
+        moving an existing freejoint body is just a state edit.
+        """
+        if (not self._spawn_block) or self._spawned_block:
+            return
+        if self._block_qpos_adr < 0 or self._right_wrist_body_id < 0:
+            return
+        # Schedule the teleport for sim_time = (now + spawn_block_after) the
+        # first time we enter this branch (which is the first step after
+        # warmup ends; the warmup path doesn't step physics).
+        if self._spawn_block_at_sim_t is None:
+            self._spawn_block_at_sim_t = float(self._d.time) + self._spawn_block_after
+            return
+        if float(self._d.time) < self._spawn_block_at_sim_t:
+            return
+        # Snapshot wrist + apply offset.
+        wp = self._d.xpos[self._right_wrist_body_id]
+        ox, oy, oz = self._spawn_block_offset
+        new_pos = (float(wp[0]) + ox, float(wp[1]) + oy, float(wp[2]) + oz)
+        a = self._block_qpos_adr
+        # Preserve the XML-declared block orientation (qpos[a+3:a+7] untouched).
+        self._d.qpos[a + 0] = new_pos[0]
+        self._d.qpos[a + 1] = new_pos[1]
+        self._d.qpos[a + 2] = new_pos[2]
+        # Zero block velocity so it spawns at rest.
+        v = self._block_qvel_adr
+        self._d.qvel[v: v + 6] = 0.0
+        mujoco.mj_forward(self._m, self._d)
+        self._spawned_block = True
+        print(f"[bridge] spawned block at hand: wrist={tuple(round(float(x),3) for x in wp)} "
+              f"+ offset={tuple(self._spawn_block_offset)} -> "
+              f"block_world={tuple(round(v,3) for v in new_pos)}",
+              flush=True)
 
     def _log_block_pose(self) -> None:
         if not self._block_log_path or self._block_qpos_adr < 0:
@@ -495,6 +646,32 @@ class MujocoDDSBridge:
             except Exception:
                 pass
             self._block_log_fh = None
+
+
+def _quat_mul(a: np.ndarray, b: np.ndarray) -> np.ndarray:
+    """Hamilton product of two unit quats (wxyz convention)."""
+    aw, ax, ay, az = float(a[0]), float(a[1]), float(a[2]), float(a[3])
+    bw, bx, by, bz = float(b[0]), float(b[1]), float(b[2]), float(b[3])
+    return np.array([
+        aw*bw - ax*bx - ay*by - az*bz,
+        aw*bx + ax*bw + ay*bz - az*by,
+        aw*by - ax*bz + ay*bw + az*bx,
+        aw*bz + ax*by - ay*bx + az*bw,
+    ], dtype=np.float64)
+
+
+def _quat_rotate(quat_wxyz: np.ndarray, v: np.ndarray) -> np.ndarray:
+    """Rotate v by quat (wxyz, unit). Result is float64 length-3."""
+    qw, qx, qy, qz = float(quat_wxyz[0]), float(quat_wxyz[1]), float(quat_wxyz[2]), float(quat_wxyz[3])
+    # q * (0,v) * q^-1
+    tx = 2.0 * (qy*v[2] - qz*v[1])
+    ty = 2.0 * (qz*v[0] - qx*v[2])
+    tz = 2.0 * (qx*v[1] - qy*v[0])
+    return np.array([
+        v[0] + qw*tx + (qy*tz - qz*ty),
+        v[1] + qw*ty + (qz*tx - qx*tz),
+        v[2] + qw*tz + (qx*ty - qy*tx),
+    ], dtype=np.float64)
 
 
 def _quat_rotate_inverse(quat_wxyz: np.ndarray, v: np.ndarray) -> np.ndarray:

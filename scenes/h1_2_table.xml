@@ -28,14 +28,12 @@
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
 
     <!-- Workbench: 71 3/4" x 29 1/2" x 36 1/16" (1.82245 x 0.7493 x 0.91695 m).
-         Length aligned along y. Near edge at world x = 0.30 m, ~2 cm clear
-         of the right wrist at FAME's crouch (wrist at world x≈0.28).
-         Top surface at z = 0.91695 — 8 cm lower than the original 39 1/4"
-         build. The shorter table puts the top BELOW the wrist's natural
-         crouch z (~0.98), so the wrist sits 6 cm above the slab. Block
-         sits on top, with the wrist landing INSIDE its z range (block z
-         from 0.917 to 1.037; wrist z 0.98) — clean side push, not glance. -->
-    <body name="table" pos="0.67465 0 0">
+         Length aligned along y. Near edge at world x = 0.20 m (moved 10cm
+         closer than before for bimanual reach — both wrists, even with
+         FAME's tilted crouch, sit ~7cm OVER the table footprint at z=1.04
+         which is 12cm above the table top z=0.917). Block sits on top
+         centered at world y=0 so both arms can pick it up. -->
+    <body name="table" pos="0.57465 0 0">
       <!-- top slab: 0.7493 (x) * 1.82245 (y) * 0.04 (z), centered at z=0.89695 (top face at z=0.91695) -->
       <geom name="table_top" type="box"
             size="0.37465 0.911225 0.02"
@@ -54,25 +52,52 @@
             pos="-0.34465 -0.881225 0.438475" material="table_leg"/>
     </body>
 
-    <!-- Pushable block — 30 cm CUBE rotated 45° about z-axis so its
-         back face is roughly perpendicular to the right wrist's
-         incoming approach direction. Measured wrist xy approach in
-         world = +42° from +x axis (FAME yaw +21° + arm-extension
-         lateral component), so a 45° z-rotation aligns the cube face
-         normal to ~-wrist direction → wrist hits the face squarely
-         instead of glancing off a corner.
-         Block center shifted forward to x=0.52 so the rotated back
-         corner (which sticks out 0.212 m from center) lands at
-         x=0.32, just on the table top (near edge x=0.30).
-         quat = (cos(22.5°), 0, 0, sin(22.5°)) = (0.924, 0, 0, 0.383)
-         Mass overridden at reset by PUSH_BLOCK_MASS env var. -->
-    <body name="push_block" pos="0.52 -0.10 0.992" quat="0.924 0 0 0.383">
+    <!-- Bimanual pick-and-place block — 12 cm cube, centered at world y=0
+         on the table top so both wrists can grip it. Axis-aligned (no
+         rotation); the previous 45° rotation was for the single-arm push
+         experiment and is removed.
+            block center world  : (0.30, 0, 0.977)
+            block extent xyz    : ±(0.06, 0.06, 0.06)
+            block bottom z      : 0.917  (= table top exactly)
+            block top z         : 1.037  (≈ wrist height at FAME crouch)
+         Mass overridden at reset by PUSH_BLOCK_MASS env var. The block
+         keeps its freejoint so it can be physically displaced (welds or
+         contact); see <equality> section below for the bimanual welds. -->
+    <body name="push_block" pos="0.30 0 0.977">
       <freejoint name="push_block_free"/>
+      <!-- 12x20x12 cm box: width (y) bumped to 20 cm so the wrist
+           positions at the grip pose (world y = ±0.077) clearly OVERLAP
+           the block sides (block faces at ±0.10). The 2-3 cm overlap
+           means the wrist visually clamps the block face — looks like a
+           tight grip even before the welds activate. After weld
+           activation the block is rigidly pinned to both wrists. -->
       <geom name="push_block_geom" type="box"
-            size="0.15 0.15 0.075"
+            size="0.06 0.10 0.06"
             mass="0.5"
             material="push_block"
             friction="1.0 0.005 0.0001"/>
     </body>
   </worldbody>
+
+  <!-- Bimanual welds: block gripped between the two wrists. Initially
+       DISABLED (active="false") because the XML compile pose (robot
+       standing upright) does NOT place the wrists at the block's sides;
+       at runtime the bridge brings the arms into the grip pose, snapshots
+       the current relative offsets, writes them into data.eq_data, then
+       sets data.eq_active=1 on both welds.
+       relpose semantics: body2's pose in body1's frame.
+       The relpose values below are placeholders — bridge overwrites them
+       at activation time. -->
+  <equality>
+    <weld name="weld_block_right"
+          body1="push_block"
+          body2="right_wrist_yaw_link"
+          relpose="0 -0.06 0 1 0 0 0"
+          active="false"/>
+    <weld name="weld_block_left"
+          body1="push_block"
+          body2="left_wrist_yaw_link"
+          relpose="0 +0.06 0 1 0 0 0"
+          active="false"/>
+  </equality>
 </mujoco>
